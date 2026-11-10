@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en" data-copy="test">
+<head>
+<meta charset="UTF-8">
+<title>Illini Playbook — Practice, Class &amp; Fuel Planner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============ TOKENS ============ */
+:root{
+  --navy:#13294B;
+  --navy-2:#1C3B6B;
+  --orange:#E84A27;
+  --orange-2:#C43A1B;
+  --turf:#2E6B45;
+  --turf-2:#245536;
+  --purple:#5B4A8A;
+  --bg:#F2EEE2;
+  --surface:#FFFDF7;
+  --surface-2:#EBE5D4;
+  --ink:#181A1E;
+  --ink-soft:#4B4E57;
+  --line:rgba(19,41,75,0.18);
+  --danger:#B3261E;
+  --danger-bg:#FBE7E3;
+  --shadow: 0 3px 0 rgba(19,41,75,0.9);
+  --font-display:'Teko', sans-serif;
+  --font-body:'Public Sans', system-ui, sans-serif;
+}
+.test-copy-banner{
+  margin:0; padding:8px 16px; text-align:center;
+  background:#FFD54F; color:#181A1E;
+  font:700 14px/1.3 var(--font-body);
+}
+:root:not([data-theme="light"]){
+  @media (prefers-color-scheme: dark){
+    --bg:#12141B;
+    --surface:#1B1E27;
+    --surface-2:#242835;
+    --ink:#ECE8DC;
+    --ink-soft:#B7B9C4;
+    --line:rgba(236,232,220,0.22);
+    --danger-bg:#3A1E1C;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12141B;
+  --surface:#1B1E27;
+  --surface-2:#242835;
+  --ink:#ECE8DC;
+  --ink-soft:#B7B9C4;
+  --line:rgba(236,232,220,0.22);
+  --danger-bg:#3A1E1C;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--font-body);
+  font-size:15px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+img{max-width:100%;}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px 80px;}
+
+/* ============ HEADER ============ */
+header.top{
+  background:var(--navy);
+  color:#F2EEE2;
+  border-bottom:6px solid var(--orange);
+}
+.top-inner{
+  max-width:1180px;margin:0 auto;padding:22px 20px 16px;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;
+}
+.brand h1{
+  font-family:var(--font-display);
+  font-weight:600;
+  font-size:clamp(34px,5.6vw,52px);
+  letter-spacing:0.5px;
+  margin:0;
+  line-height:0.92;
+}
+.brand h1 span{color:var(--orange);}
+.brand p{
+  margin:6px 0 0;
+  font-size:13.5px;
+  color:#C7CEDC;
+  max-width:46ch;
+}
+.brand .kicker{
+  font-family:var(--font-display);
+  font-size:15px;
+  letter-spacing:2px;
+  color:#8DA0C4;
+  margin:0 0 2px;
+}
+
+nav.tabs{
+  display:flex;gap:8px;flex-wrap:wrap;
+}
+nav.tabs button{
+  font-family:var(--font-display);
+  font-size:19px;
+  letter-spacing:0.5px;
+  background:transparent;
+  border:2px solid rgba(242,238,226,0.35);
+  color:#D9DEEA;
+  padding:7px 16px 5px;
+  cursor:pointer;
+  transition:background .15s, color .15s, border-color .15s;
+}
+nav.tabs button:hover{border-color:#F2EEE2;color:#fff;}
+nav.tabs button.active{
+  background:var(--orange);
+  border-color:var(--orange);
+  color:#fff;
+}
+nav.tabs button:focus-visible{outline:3px solid #fff;outline-offset:2px;}
+
+/* ============ SECTIONS ============ */
+section.tab{display:none;padding-top:26px;}
+section.tab.active{display:block;}
+
+h2.section-title{
+  font-family:var(--font-display);
+  font-size:32px;
+  font-weight:600;
+  letter-spacing:0.3px;
+  margin:0 0 4px;
+  color:var(--navy);
+}
+:root[data-theme="dark"] h2.section-title{color:#EDEFF5;}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) h2.section-title{color:#EDEFF5;} }
+
+p.section-sub{margin:0 0 18px;color:var(--ink-soft);font-size:14px;font-weight:600;}
+
+.card{
+  background:var(--surface);
+  border:2px solid var(--ink);
+  box-shadow:var(--shadow);
+}
+
+/* ============ STRESS SNAPSHOT ============ */
+.snapshot{
+  display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:26px;
+}
+/* Display only, not tappable: no box border, so it doesn't read as a button. */
+.snap-day{
+  padding:10px 8px 8px;text-align:center;border-bottom:3px solid transparent;
+}
+.snap-day.busiest{border-bottom-color:var(--orange);}
+.snap-day .d{font-family:var(--font-display);font-size:19px;letter-spacing:1px;color:var(--ink-soft);}
+.snap-day .bar-track{height:56px;display:flex;align-items:flex-end;justify-content:center;margin:6px 0;}
+.snap-day .bar{width:16px;background:var(--navy);}
+.snap-day.busiest .bar{background:var(--orange);}
+.snap-day .hrs{font-size:11.5px;color:var(--ink-soft);}
+
+/* ============ CONFLICTS BANNER ============ */
+.conflict-banner{
+  border:2px solid var(--danger);
+  background:var(--danger-bg);
+  color:var(--danger);
+  padding:12px 16px;margin-bottom:20px;
+  display:flex;gap:10px;align-items:flex-start;
+  font-size:14px;
+}
+.conflict-banner strong{font-family:var(--font-display);font-size:18px;letter-spacing:.3px;display:block;}
+.conflict-banner ul{margin:6px 0 0;padding-left:18px;}
+
+/* ============ SCHEDULE GRID ============ */
+.grid-scroll{overflow-x:auto;border:2px solid var(--ink);background:var(--surface);}
+.week-grid{
+  display:grid;
+  grid-template-columns:52px repeat(7,minmax(120px,1fr));
+  min-width:900px;
+}
+.corner{border-right:2px solid var(--ink);border-bottom:2px solid var(--ink);background:var(--surface-2);}
+.day-head{
+  border-right:1px solid var(--line);border-bottom:2px solid var(--ink);
+  text-align:center;padding:10px 4px;background:var(--surface-2);
+  font-family:var(--font-display);font-size:20px;letter-spacing:1px;color:var(--navy);
+}
+:root[data-theme="dark"] .day-head{color:#EDEFF5;}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .day-head{color:#EDEFF5;} }
+.day-head small{display:block;font-family:var(--font-body);font-size:10.5px;color:var(--ink-soft);letter-spacing:0;font-weight:600;}
+
+.time-col{position:relative;border-right:2px solid var(--ink);}
+.time-label{
+  position:absolute;right:6px;transform:translateY(-50%);
+  font-family:var(--font-display);font-size:12.5px;color:var(--ink-soft);
+}
+.day-col{position:relative;border-right:1px solid var(--line);background:
+  repeating-linear-gradient(to bottom, transparent 0, transparent 35px, var(--line) 35px, var(--line) 36px);
+}
+.hour-line{position:absolute;left:0;right:0;border-top:1px dashed var(--line);}
+
+/* Display only, not tappable: flat (no outline or shadow) so it doesn't look like a button. */
+.block{
+  position:absolute;left:3px;right:3px;
+  border-left:4px solid rgba(0,0,0,0.3);
+  border-radius:3px;
+  padding:4px 6px 3px;
+  font-size:11.5px;
+  overflow:hidden;
+  cursor:default;
+}
+.block .t{font-family:var(--font-display);font-size:14px;letter-spacing:.2px;line-height:1;display:block;}
+.block .loc{opacity:.85;display:block;font-size:10.5px;margin-top:1px;}
+.block.conflict{
+  background-image:repeating-linear-gradient(135deg, rgba(255,255,255,.25) 0 6px, rgba(0,0,0,.06) 6px 12px);
+  outline:3px solid var(--danger);
+  outline-offset:-3px;
+}
+.type-practice{background:var(--orange);color:#fff;}
+.type-class{background:var(--navy);color:#fff;}
+.type-club{background:var(--turf);color:#fff;}
+.type-interview{background:var(--purple);color:#fff;}
+.type-other{background:#6B6F7A;color:#fff;}
+
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin:14px 0 0;font-size:12.5px;color:var(--ink-soft);}
+.legend span{display:inline-flex;align-items:center;gap:6px;}
+.legend i{width:12px;height:12px;display:inline-block;border:1.5px solid var(--ink);}
+
+/* ============ FORMS ============ */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;}
+.form-grid .full{grid-column:1/-1;}
+label{display:block;font-size:12.5px;font-weight:700;letter-spacing:.3px;margin-bottom:5px;color:var(--ink-soft);text-transform:uppercase;}
+input[type=text],input[type=time],select,textarea{
+  width:100%;padding:9px 10px;border:2px solid var(--ink);background:var(--surface);
+  font-family:var(--font-body);font-size:14.5px;color:var(--ink);
+}
+textarea{resize:vertical;min-height:56px;}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:3px solid var(--navy);outline-offset:1px;}
+.daypick{display:flex;gap:6px;flex-wrap:wrap;}
+.daypick label{
+  text-transform:none;font-weight:600;font-size:13px;color:var(--ink);
+  border:2px solid var(--ink);padding:6px 10px;cursor:pointer;user-select:none;margin:0;
+  display:flex;align-items:center;gap:5px;
+}
+.daypick input{margin:0;}
+.daypick label:has(input:checked){background:var(--navy);color:#fff;}
+
+.btn{
+  font-family:var(--font-display);font-size:19px;letter-spacing:.4px;
+  background:var(--orange);color:#fff;border:2px solid var(--ink);
+  padding:8px 20px 6px;cursor:pointer;box-shadow:var(--shadow);
+}
+.btn:hover{background:var(--orange-2);}
+.btn.secondary{background:var(--surface);color:var(--ink);}
+.btn.secondary:hover{background:var(--surface-2);}
+.btn.ghost{background:transparent;color:var(--danger);border-color:var(--danger);box-shadow:none;font-size:13px;padding:4px 10px;font-family:var(--font-body);font-weight:700;}
+
+.commit-list{margin-top:26px;}
+.commit-row{
+  display:flex;align-items:center;gap:12px;padding:10px 12px;border:2px solid var(--line);
+  background:var(--surface);margin-bottom:8px;
+}
+.commit-row .swatch{width:10px;align-self:stretch;flex:none;}
+.commit-row .info{flex:1;min-width:0;}
+.commit-row .info b{font-size:14.5px;}
+.commit-row .info .meta{font-size:12px;color:var(--ink-soft);}
+.commit-row .actions{display:flex;gap:8px;flex:none;}
+.commit-row button.icon{background:none;border:none;cursor:pointer;font-size:13px;font-weight:700;color:var(--navy);}
+
+/* ============ FUEL TAB ============ */
+.day-selector{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:22px;}
+.day-selector button{
+  font-family:var(--font-display);font-size:18px;padding:6px 16px 4px;
+  border:2px solid var(--ink);background:var(--surface);cursor:pointer;color:var(--ink);
+}
+.day-selector button.active{background:var(--turf);color:#fff;border-color:var(--turf-2);}
+
+.gap-card{border:2px solid var(--ink);background:var(--surface);margin-bottom:18px;box-shadow:var(--shadow);}
+.gap-head{
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;
+  padding:12px 16px;border-bottom:2px solid var(--ink);background:var(--surface-2);
+}
+.gap-head .label{font-family:var(--font-display);font-size:22px;letter-spacing:.3px;color:var(--navy);}
+:root[data-theme="dark"] .gap-head .label{color:#EDEFF5;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .gap-head .label{color:#EDEFF5;}}
+.gap-head .window{font-size:13px;color:var(--ink-soft);font-weight:600;}
+.tagpill{
+  font-size:10.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;
+  padding:3px 8px;border:1.5px solid var(--ink);background:#fff;color:var(--ink);
+}
+.gap-head .label.pre-tag{background:#FFE6C7;color:var(--orange-2);border-color:var(--orange-2);}
+.gap-head .label.rec-tag{background:#D8ECDF;color:var(--turf-2);border-color:var(--turf-2);}
+
+.suggest-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;padding:14px 16px;}
+/* Food cards, macros and tags are display only: flat, thin dividers, no button-style borders. */
+.food-card{border-top:1px solid var(--line);padding:10px 12px;background:var(--bg);}
+.food-card .name{font-weight:700;font-size:14px;margin:0 0 2px;}
+.food-card .from{font-size:11.5px;color:var(--ink-soft);margin-bottom:8px;}
+.macro-row{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;}
+.macro{font-weight:700;}
+.food-tags{margin-top:6px;display:flex;gap:4px 10px;flex-wrap:wrap;}
+.food-tags span{font-size:9.5px;letter-spacing:.3px;text-transform:uppercase;color:var(--ink-soft);}
+.empty-note{padding:16px;color:var(--ink-soft);font-size:13.5px;}
+
+.fuel-profile{padding:16px;margin-bottom:18px;}
+.fuel-profile .calc-box{margin-bottom:8px;}
+.fuel-help{margin:0;font-size:12.5px;color:var(--ink-soft);}
+.fuel-weight-message{margin:6px 0 0;font-size:13px;font-weight:700;color:var(--danger);min-height:1.2em;}
+.fuel-change{margin:8px 0 0;font-size:14px;font-weight:700;}
+.gap-goal{grid-column:1/-1;margin:12px 0 0;font-weight:700;font-size:14px;}
+.new-pick{
+  display:inline-block;margin-bottom:6px;padding:1px 7px;font-size:10.5px;font-weight:800;letter-spacing:.4px;
+  text-transform:uppercase;background:var(--turf);color:#fff;
+}
+
+.fuel-note{
+  border:2px dashed var(--line);padding:12px 14px;font-size:13px;color:var(--ink-soft);margin-top:18px;
+}
+
+/* ============ DINING TAB ============ */
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;}
+.filters select,.filters input{width:auto;min-width:150px;}
+.hall-block{margin-bottom:28px;}
+.hall-title{
+  font-family:var(--font-display);font-size:26px;color:var(--navy);border-bottom:3px solid var(--orange);
+  padding-bottom:4px;margin:0 0 4px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+}
+:root[data-theme="dark"] .hall-title{color:#EDEFF5;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .hall-title{color:#EDEFF5;}}
+.hall-title .addr{font-family:var(--font-body);font-size:12px;color:var(--ink-soft);font-weight:600;}
+details.acc .addr{font-family:var(--font-body);font-size:12px;color:var(--ink-soft);font-weight:600;}
+.hall-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:12px;}
+
+.calc-box{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:16px;}
+/* ============ ACCORDION ============ */
+details.acc{border:2px solid var(--ink);background:var(--surface);margin-bottom:14px;box-shadow:var(--shadow);}
+details.acc > summary{
+  cursor:pointer;list-style:none;padding:12px 16px;
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  font-family:var(--font-display);font-size:22px;letter-spacing:.3px;color:var(--navy);
+  background:var(--surface-2);
+}
+:root[data-theme="dark"] details.acc > summary{color:#EDEFF5;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) details.acc > summary{color:#EDEFF5;}}
+details.acc > summary::-webkit-details-marker{display:none;}
+details.acc > summary::marker{content:"";}
+details.acc > summary .chev{
+  font-family:var(--font-body);font-size:13px;font-weight:800;color:var(--ink-soft);
+  border:2px solid var(--ink);width:22px;height:22px;flex:none;display:flex;align-items:center;justify-content:center;
+}
+details.acc[open] > summary .chev{background:var(--orange);color:#fff;border-color:var(--orange-2);}
+details.acc[open] > summary{border-bottom:2px solid var(--ink);}
+details.acc .acc-body{padding:14px 16px;}
+
+.result-strip{display:flex;gap:14px;flex-wrap:wrap;margin-top:16px;}
+/* Display only: flat, no button-style border. */
+.result-chip{border-left:3px solid var(--orange);padding:4px 16px 4px 12px;min-width:130px;}
+.result-chip .num{font-family:var(--font-display);font-size:30px;line-height:1;color:var(--navy);}
+:root[data-theme="dark"] .result-chip .num{color:#EDEFF5;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .result-chip .num{color:#EDEFF5;}}
+.result-chip .lbl{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;font-weight:700;}
+
+footer.foot{
+  text-align:center;color:var(--ink-soft);font-size:12px;padding:30px 20px 10px;
+}
+
+@media (max-width:640px){
+  .form-grid{grid-template-columns:1fr;}
+  .snapshot{grid-template-columns:repeat(4,1fr);}
+  .top-inner{align-items:flex-start;}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <p class="kicker">UIUC ATHLETICS</p>
+      <h1>Illini <span>Playbook</span></h1>
+      <p>Schedule + fuel, one board.</p>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-tab="schedule" class="active">Schedule</button>
+      <button data-tab="add">Add</button>
+      <button data-tab="fuel">Fuel</button>
+      <button data-tab="dining">Dining</button>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ============ SCHEDULE TAB ============ -->
+  <section class="tab active" id="tab-schedule">
+    <h2 class="section-title">Weekly board</h2>
+    <p class="section-sub">Hazard borders mark conflicts.</p>
+
+    <div class="snapshot" id="snapshot"></div>
+
+    <div id="conflictBanner"></div>
+
+    <div class="grid-scroll">
+      <div class="week-grid" id="weekGrid"></div>
+    </div>
+
+    <div class="legend">
+      <span><i style="background:var(--orange)"></i> Practice</span>
+      <span><i style="background:var(--navy)"></i> Class</span>
+      <span><i style="background:var(--turf)"></i> Club</span>
+      <span><i style="background:var(--purple)"></i> Interview</span>
+      <span><i style="background:#6B6F7A"></i> Other</span>
+    </div>
+  </section>
+
+  <!-- ============ ADD TAB ============ -->
+  <section class="tab" id="tab-add">
+    <h2 class="section-title">Add a commitment</h2>
+    <p class="section-sub">Repeats weekly on the days you pick.</p>
+
+    <form class="card" id="commitForm" style="padding:20px;">
+      <div class="form-grid">
+        <div>
+          <label for="f-title">Title</label>
+          <input type="text" id="f-title" placeholder="Morning lift, ENG 100 lecture" required>
+        </div>
+        <div>
+          <label for="f-type">Type</label>
+          <select id="f-type">
+            <option value="practice">Practice</option>
+            <option value="class">Class</option>
+            <option value="club">Club</option>
+            <option value="interview">Interview</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label for="f-start">Start</label>
+          <input type="time" id="f-start" required>
+        </div>
+        <div>
+          <label for="f-end">End</label>
+          <input type="time" id="f-end" required>
+        </div>
+        <div class="full">
+          <label>Days</label>
+          <div class="daypick" id="dayPick"></div>
+        </div>
+        <div>
+          <label for="f-loc">Location</label>
+          <input type="text" id="f-loc" placeholder="Ubben Basketball Complex">
+        </div>
+        <div>
+          <label for="f-notes">Notes</label>
+          <input type="text" id="f-notes" placeholder="Bring cleats, Zoom link">
+        </div>
+      </div>
+      <div style="margin-top:18px;display:flex;gap:10px;align-items:center;">
+        <button type="submit" class="btn" id="submitBtn">Add to board</button>
+        <button type="button" class="btn secondary" id="cancelEdit" style="display:none;">Cancel</button>
+        <span id="formMsg" style="font-size:13px;color:var(--danger);font-weight:700;"></span>
+      </div>
+    </form>
+
+    <details class="acc">
+      <summary><span id="commitSummary">Your commitments</span><span class="chev">⌄</span></summary>
+      <div class="acc-body commit-list" id="commitList"></div>
+    </details>
+  </section>
+
+  <!-- ============ FUEL TAB ============ -->
+  <section class="tab" id="tab-fuel">
+    <h2 class="section-title">Fuel plan</h2>
+    <p class="section-sub">Open windows between commitments, with what to eat.</p>
+
+    <div class="card fuel-profile">
+      <div class="calc-box">
+        <div>
+          <label for="fuel-weight">Weight (lb)</label>
+          <input type="text" id="fuel-weight" inputmode="decimal" placeholder="165">
+        </div>
+        <div>
+          <label for="fuel-load">Training load</label>
+          <select id="fuel-load">
+            <option value="rest">Rest day</option>
+            <option value="moderate">Moderate</option>
+            <option value="hard" selected>Hard / two-a-day</option>
+          </select>
+        </div>
+      </div>
+      <p class="fuel-help">Each goal is your daily target split across 4 meals. Ballpark only — not individualized advice.</p>
+      <p class="fuel-weight-message" id="fuel-weight-message" role="status"></p>
+      <p class="fuel-change" id="fuel-change" aria-live="polite"></p>
+    </div>
+
+    <div class="day-selector" id="fuelDaySelector"></div>
+    <div id="gapResults"></div>
+
+    <div class="fuel-note">Under 20 min isn't shown. Menus are samples — check the Illinois app for the day's actual offerings.</div>
+  </section>
+
+  <!-- ============ DINING TAB ============ -->
+  <section class="tab" id="tab-dining">
+    <h2 class="section-title">Dining hall directory</h2>
+    <p class="section-sub">Sample menus, all four halls. Not live — check the Illinois app.</p>
+
+    <details class="acc">
+      <summary>Fueling targets<span class="chev">⌄</span></summary>
+      <div class="acc-body">
+      <div class="calc-box">
+        <div>
+          <label for="c-weight">Weight (lb)</label>
+          <input type="text" id="c-weight" inputmode="numeric" placeholder="165">
+        </div>
+        <div>
+          <label for="c-load">Training load</label>
+          <select id="c-load">
+            <option value="rest">Rest day</option>
+            <option value="moderate">Moderate</option>
+            <option value="hard" selected>Hard / two-a-day</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn secondary" id="calcBtn" type="button">Estimate</button>
+      <div class="result-strip" id="calcResult"></div>
+      <p style="font-size:11.5px;color:var(--ink-soft);margin:12px 0 0;">Ballpark only — not individualized advice.</p>
+      </div>
+    </details>
+
+    <div class="filters">
+      <select id="filterHall"><option value="all">All halls</option></select>
+      <select id="filterMeal">
+        <option value="all">All meals</option>
+        <option value="breakfast">Breakfast</option>
+        <option value="lunch">Lunch</option>
+        <option value="dinner">Dinner</option>
+      </select>
+      <select id="filterTag">
+        <option value="all">Any tag</option>
+        <option value="high-protein">High protein</option>
+        <option value="pre-workout">Pre-workout</option>
+        <option value="recovery">Recovery</option>
+        <option value="vegetarian">Vegetarian</option>
+        <option value="vegan">Vegan</option>
+        <option value="gluten-free">Gluten-free</option>
+      </select>
+    </div>
+
+    <div id="diningDirectory"></div>
+  </section>
+
+</div>
+
+<footer class="foot">Illini Playbook · Not affiliated with University Housing · Menu figures are illustrative.</footer>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   DATA
+============================================================ */
+var DAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+var DAY_FULL = {Mon:"Monday",Tue:"Tuesday",Wed:"Wednesday",Thu:"Thursday",Fri:"Friday",Sat:"Saturday",Sun:"Sunday"};
+
+var TYPE_META = {
+  practice:{label:"Practice", cls:"type-practice"},
+  class:{label:"Class", cls:"type-class"},
+  club:{label:"Club", cls:"type-club"},
+  interview:{label:"Interview", cls:"type-interview"},
+  other:{label:"Other", cls:"type-other"}
+};
+
+// Sample dining hall data — illustrative nutrition figures for planning only.
+var DINING_HALLS = [
+  {
+    id:"ike", name:"Ikenberry Dining Center", nick:"The Ike",
+    addr:"301 E. Gregory Dr, Champaign",
+    items:[
+      {name:"Scrambled eggs + turkey sausage", station:"Gregory Street Diner", meal:"breakfast", cal:420, protein:34, carbs:14, fat:26, tags:["high-protein","gluten-free"]},
+      {name:"Steel-cut oats, banana & peanut butter", station:"Gregory Street Diner", meal:"breakfast", cal:460, protein:15, carbs:70, fat:14, tags:["pre-workout","vegetarian"]},
+      {name:"Grilled chicken penne, marinara", station:"Penne Lane", meal:"lunch", cal:640, protein:42, carbs:78, fat:16, tags:["recovery","high-protein"]},
+      {name:"Chophouse sirloin, roasted potatoes", station:"Don's Chophouse", meal:"dinner", cal:710, protein:48, carbs:52, fat:30, tags:["recovery","high-protein","gluten-free"]},
+      {name:"Soytainly tofu stir-fry & rice", station:"Soytainly", meal:"dinner", cal:560, protein:24, carbs:82, fat:14, tags:["vegan","recovery"]},
+      {name:"Prairie Fire chicken burrito bowl", station:"Prairie Fire", meal:"lunch", cal:590, protein:38, carbs:64, fat:18, tags:["high-protein","gluten-free"]},
+      {name:"Bagel, cream cheese & fruit cup", station:"Euclid Street Deli", meal:"breakfast", cal:380, protein:11, carbs:66, fat:9, tags:["pre-workout","vegetarian"]}
+    ]
+  },
+  {
+    id:"isr", name:"ISR Dining Center", nick:"ISR",
+    addr:"1010 W. Illinois St, Urbana",
+    items:[
+      {name:"Taste of Asia chicken fried rice", station:"Taste of Asia", meal:"lunch", cal:610, protein:30, carbs:86, fat:15, tags:["pre-workout"]},
+      {name:"Cocina Mexicana carne asada bowl", station:"Cocina Mexicana", meal:"dinner", cal:670, protein:40, carbs:64, fat:24, tags:["recovery","gluten-free"]},
+      {name:"CHOMPS double patty, side salad", station:"CHOMPS", meal:"dinner", cal:720, protein:38, carbs:48, fat:38, tags:["recovery"]},
+      {name:"Greek yogurt parfait, granola & berries", station:"Grab & Go", meal:"breakfast", cal:340, protein:20, carbs:52, fat:6, tags:["high-protein","vegetarian","gluten-free"]},
+      {name:"Veggie fried rice, edamame", station:"Taste of Asia", meal:"lunch", cal:520, protein:16, carbs:88, fat:10, tags:["vegan","pre-workout"]},
+      {name:"Whole wheat waffles & turkey bacon", station:"Grab & Go", meal:"breakfast", cal:480, protein:22, carbs:60, fat:16, tags:["pre-workout"]}
+    ]
+  },
+  {
+    id:"par", name:"PAR Dining Hall", nick:"PAR",
+    addr:"906 W. College Ct, Urbana",
+    items:[
+      {name:"Penn Station grilled chicken sub", station:"Penn Station", meal:"lunch", cal:560, protein:36, carbs:58, fat:18, tags:["high-protein"]},
+      {name:"Build-your-own omelet, spinach & feta", station:"Omelet Bar", meal:"breakfast", cal:390, protein:28, carbs:8, fat:26, tags:["high-protein","gluten-free","vegetarian"]},
+      {name:"Baked salmon, quinoa & broccoli", station:"Coastal Kitchen", meal:"dinner", cal:600, protein:40, carbs:46, fat:24, tags:["recovery","gluten-free","high-protein"]},
+      {name:"Pasta primavera, garlic bread", station:"Italiano", meal:"dinner", cal:640, protein:18, carbs:96, fat:18, tags:["pre-workout","vegetarian"]},
+      {name:"PB&J on whole grain, apple slices", station:"Grab & Go", meal:"lunch", cal:420, protein:12, carbs:64, fat:14, tags:["pre-workout","vegan"]},
+      {name:"Overnight oats with almond milk & berries", station:"Grab & Go", meal:"breakfast", cal:360, protein:10, carbs:58, fat:10, tags:["pre-workout","vegan","gluten-free"]}
+    ]
+  },
+  {
+    id:"lar", name:"Lincoln/Allen Dining Hall", nick:"LAR",
+    addr:"1005 W. Gregory Dr, Urbana",
+    items:[
+      {name:"Field of Greens power bowl, grilled chicken", station:"Field of Greens", meal:"lunch", cal:520, protein:34, carbs:44, fat:20, tags:["high-protein","recovery","gluten-free"]},
+      {name:"Leafy! chickpea & farro salad", station:"Leafy!", meal:"lunch", cal:480, protein:18, carbs:64, fat:14, tags:["vegan","pre-workout"]},
+      {name:"BBQ pulled pork, mac & cheese", station:"Comfort Kitchen", meal:"dinner", cal:760, protein:36, carbs:70, fat:36, tags:["recovery"]},
+      {name:"Egg white breakfast burrito", station:"Breakfast Bar", meal:"breakfast", cal:410, protein:30, carbs:38, fat:14, tags:["high-protein"]},
+      {name:"Grilled tofu & vegetable rice bowl", station:"Field of Greens", meal:"dinner", cal:540, protein:22, carbs:78, fat:12, tags:["vegan","recovery","gluten-free"]},
+      {name:"Yogurt & honey with mixed nuts", station:"Grab & Go", meal:"breakfast", cal:320, protein:16, carbs:34, fat:14, tags:["vegetarian","gluten-free"]}
+    ]
+  }
+];
+
+/* deploy.sh marks the published test copy with <html data-copy="test">. It shares a
+   website with the main copy, so it saves under its own names to keep the two apart. */
+var IS_TEST_COPY = document.documentElement.getAttribute("data-copy") === "test";
+var STORAGE_PREFIX = IS_TEST_COPY ? "test-" : "";
+var STORAGE_KEY = STORAGE_PREFIX + "illini-playbook-commitments-v1";
+var PROFILE_KEY = STORAGE_PREFIX + "illini-playbook-profile-v1";
+if (IS_TEST_COPY) {
+  var testBanner = document.createElement("p");
+  testBanner.className = "test-copy-banner";
+  testBanner.textContent = "Test copy: changes being tried out. Saved data here is separate from the main app.";
+  document.body.insertBefore(testBanner, document.body.firstChild);
+  document.title = "TEST · " + document.title;
+}
+var MIN_WEIGHT_LB = 50, MAX_WEIGHT_LB = 500;
+var MEALS_PER_DAY = 4;
+var LOAD_LABELS = {rest:"rest day", moderate:"moderate training", hard:"hard training"};
+
+/* ============================================================
+   STATE
+============================================================ */
+var state = {
+  commitments: [],
+  editingId: null,
+  fuelDay: "Mon",
+  profile: {weight:null, load:"hard"},
+  previousProfile: null
+};
+
+function loadCommitments(){
+  try{
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      state.commitments = JSON.parse(raw);
+      return;
+    }
+  }catch(e){ /* storage unavailable or empty — fall through to seed */ }
+  // seed with a light example so the board isn't empty on first visit
+  state.commitments = [
+    {id:"seed1", title:"Morning lift", type:"practice", days:["Mon","Wed","Fri"], start:"06:00", end:"07:15", loc:"Ubben Basketball Complex", notes:""},
+    {id:"seed2", title:"KIN 250 lecture", type:"class", days:["Mon","Wed","Fri"], start:"09:00", end:"09:50", loc:"Freer Hall", notes:""},
+    {id:"seed3", title:"Team practice", type:"practice", days:["Mon","Tue","Wed","Thu","Fri"], start:"14:30", end:"17:00", loc:"State Farm Center", notes:""},
+    {id:"seed4", title:"SAAC meeting", type:"club", days:["Tue"], start:"18:00", end:"19:00", loc:"Bielfeldt Athletic Administration Bldg", notes:""},
+    {id:"seed5", title:"ENG 100 discussion", type:"class", days:["Tue","Thu"], start:"11:00", end:"12:15", loc:"Grainger Library", notes:""}
+  ];
+}
+function saveCommitments(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state.commitments)); }
+  catch(e){ /* storage unavailable — state still holds for this session */ }
+}
+
+function loadProfile(){
+  try{
+    var saved = JSON.parse(localStorage.getItem(PROFILE_KEY));
+    if(saved && LOAD_LABELS[saved.load] && (saved.weight===null || isValidWeight(saved.weight))){
+      state.profile = {weight:saved.weight, load:saved.load};
+    }
+  }catch(e){ /* storage unavailable or unreadable — keep the default profile */ }
+}
+function saveProfile(){
+  try{ localStorage.setItem(PROFILE_KEY, JSON.stringify(state.profile)); }
+  catch(e){ /* storage unavailable — profile still holds for this session */ }
+}
+function isValidWeight(lb){ return lb>=MIN_WEIGHT_LB && lb<=MAX_WEIGHT_LB; }
+
+function uid(){ return "c"+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function toMin(hhmm){ var p=hhmm.split(":"); return (+p[0])*60+(+p[1]); }
+function fmtTime(hhmm){
+  var m = toMin(hhmm), h = Math.floor(m/60), mi = m%60;
+  var ap = h>=12 ? "P" : "A";
+  var h12 = h%12; if(h12===0) h12=12;
+  return h12 + (mi? ":"+String(mi).padStart(2,"0") : "") + ap;
+}
+
+/* ============================================================
+   TABS
+============================================================ */
+document.getElementById("tabs").addEventListener("click", function(e){
+  var btn = e.target.closest("button[data-tab]");
+  if(!btn) return;
+  document.querySelectorAll("nav.tabs button").forEach(function(b){b.classList.toggle("active", b===btn);});
+  document.querySelectorAll("section.tab").forEach(function(s){s.classList.toggle("active", s.id==="tab-"+btn.dataset.tab);});
+  if(btn.dataset.tab==="fuel") renderFuel();
+});
+
+/* ============================================================
+   DAY PICKER (add form)
+============================================================ */
+function buildDayPick(){
+  var wrap = document.getElementById("dayPick");
+  wrap.innerHTML = DAYS.map(function(d){
+    return '<label><input type="checkbox" value="'+d+'"> '+d+'</label>';
+  }).join("");
+}
+
+/* ============================================================
+   LAYOUT ALGORITHM — overlap columns per day
+============================================================ */
+function layoutDay(events){
+  events = events.slice().sort(function(a,b){ return a.startMin - b.startMin; });
+  var clusters = [], current = [], clusterEnd = -Infinity;
+  events.forEach(function(e){
+    if(current.length && e.startMin < clusterEnd){
+      current.push(e); clusterEnd = Math.max(clusterEnd, e.endMin);
+    } else {
+      if(current.length) clusters.push(current);
+      current = [e]; clusterEnd = e.endMin;
+    }
+  });
+  if(current.length) clusters.push(current);
+
+  clusters.forEach(function(cluster){
+    var columns = []; // end time per column
+    cluster.forEach(function(e){
+      var placed = false;
+      for(var c=0;c<columns.length;c++){
+        if(columns[c] <= e.startMin){ e.col = c; columns[c] = e.endMin; placed = true; break; }
+      }
+      if(!placed){ e.col = columns.length; columns.push(e.endMin); }
+    });
+    cluster.forEach(function(e){ e.numCols = columns.length; });
+  });
+  return events;
+}
+
+/* ============================================================
+   RENDER SCHEDULE
+============================================================ */
+var DAY_START = 5*60, DAY_END = 23*60, PX_PER_MIN = 0.62;
+var GRID_HEIGHT = (DAY_END - DAY_START) * PX_PER_MIN;
+
+function expandByDay(){
+  var byDay = {}; DAYS.forEach(function(d){ byDay[d]=[]; });
+  state.commitments.forEach(function(c){
+    c.days.forEach(function(d){
+      if(!byDay[d]) return;
+      byDay[d].push({
+        ref:c, startMin: toMin(c.start), endMin: toMin(c.end)
+      });
+    });
+  });
+  return byDay;
+}
+
+function renderSnapshot(byDay){
+  var el = document.getElementById("snapshot");
+  var totals = DAYS.map(function(d){
+    return byDay[d].reduce(function(sum,e){ return sum + (e.endMin-e.startMin); },0);
+  });
+  var max = Math.max.apply(null, totals.concat([1]));
+  var busiestIdx = totals.indexOf(max);
+  el.innerHTML = DAYS.map(function(d,i){
+    var h = totals[i]/60;
+    var barH = Math.max(4, (totals[i]/max)*56);
+    return '<div class="snap-day'+(i===busiestIdx && max>0 ? ' busiest':'')+'">'+
+      '<div class="d">'+d+'</div>'+
+      '<div class="bar-track"><div class="bar" style="height:'+barH.toFixed(0)+'px"></div></div>'+
+      '<div class="hrs">'+h.toFixed(1)+'h</div>'+
+      '</div>';
+  }).join("");
+}
+
+function renderConflictBanner(byDay){
+  var el = document.getElementById("conflictBanner");
+  var lines = [];
+  DAYS.forEach(function(d){
+    var laidOut = layoutDay(byDay[d]);
+    var seen = {};
+    laidOut.forEach(function(e){
+      if(e.numCols>1 && !seen[e.ref.id]){
+        seen[e.ref.id]=true;
+        lines.push(d+": \u201c"+e.ref.title+"\u201d overlaps");
+      }
+    });
+  });
+  if(lines.length===0){ el.innerHTML=""; return; }
+  el.innerHTML = '<div class="conflict-banner"><span style="font-size:20px;">\u26A0\uFE0F</span><div><strong>'+lines.length+' scheduling conflict'+(lines.length>1?'s':'')+' this week</strong><ul>'+
+    lines.map(function(l){ return '<li>'+l+'</li>'; }).join("") +
+    '</ul></div></div>';
+}
+
+function renderGrid(byDay){
+  var grid = document.getElementById("weekGrid");
+  var html = '<div class="corner"></div>';
+  DAYS.forEach(function(d){
+    html += '<div class="day-head">'+d+'<small>'+DAY_FULL[d]+'</small></div>';
+  });
+
+  // time column
+  html += '<div class="time-col" style="height:'+GRID_HEIGHT+'px;">';
+  for(var h=5; h<=23; h++){
+    var top = (h*60-DAY_START)*PX_PER_MIN;
+    var lab = h===12?"12P":(h>12? (h-12)+"P" : h+"A");
+    html += '<div class="time-label" style="top:'+top+'px">'+lab+'</div>';
+  }
+  html += '</div>';
+
+  DAYS.forEach(function(d){
+    var laidOut = layoutDay(byDay[d]);
+    html += '<div class="day-col" style="height:'+GRID_HEIGHT+'px;">';
+    for(var h=5; h<=23; h++){
+      var top = (h*60-DAY_START)*PX_PER_MIN;
+      html += '<div class="hour-line" style="top:'+top+'px"></div>';
+    }
+    laidOut.forEach(function(e){
+      var top = (e.startMin-DAY_START)*PX_PER_MIN;
+      var height = Math.max(18,(e.endMin-e.startMin)*PX_PER_MIN - 2);
+      var widthPct = 100/e.numCols;
+      var leftPct = e.col*widthPct;
+      var meta = TYPE_META[e.ref.type] || TYPE_META.other;
+      html += '<div class="block '+meta.cls+(e.numCols>1?' conflict':'')+'" style="top:'+top+'px;height:'+height+'px;left:calc('+leftPct+'% + 3px);width:calc('+widthPct+'% - 6px);" title="'+escapeAttr(e.ref.title+' · '+fmtTime(e.ref.start)+'\u2013'+fmtTime(e.ref.end)+(e.ref.loc? ' · '+e.ref.loc:''))+'">'+
+        '<span class="t">'+escapeHtml(e.ref.title)+'</span>'+
+        '<span class="loc">'+fmtTime(e.ref.start)+'\u2013'+fmtTime(e.ref.end)+(e.ref.loc?' \u00b7 '+escapeHtml(e.ref.loc):'')+'</span>'+
+        '</div>';
+    });
+    html += '</div>';
+  });
+
+  grid.innerHTML = html;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+  });
+}
+function escapeAttr(s){ return escapeHtml(s); }
+
+function renderSchedule(){
+  var byDay = expandByDay();
+  renderSnapshot(byDay);
+  renderConflictBanner(byDay);
+  renderGrid(byDay);
+}
+
+/* ============================================================
+   ADD / EDIT / DELETE COMMITMENTS
+============================================================ */
+function renderCommitList(){
+  var el = document.getElementById("commitList");
+  var summaryEl = document.getElementById("commitSummary");
+  if(summaryEl) summaryEl.textContent = "Your commitments (" + state.commitments.length + ")";
+  if(state.commitments.length===0){
+    el.innerHTML = '<p class="empty-note">Nothing added yet.</p>';
+    return;
+  }
+  var sorted = state.commitments.slice().sort(function(a,b){ return toMin(a.start)-toMin(b.start); });
+  el.innerHTML = sorted.map(function(c){
+    var meta = TYPE_META[c.type] || TYPE_META.other;
+    return '<div class="commit-row">'+
+      '<div class="swatch '+meta.cls+'"></div>'+
+      '<div class="info"><b>'+escapeHtml(c.title)+'</b><div class="meta">'+meta.label+' \u00b7 '+c.days.join("/")+' \u00b7 '+fmtTime(c.start)+'\u2013'+fmtTime(c.end)+(c.loc?' \u00b7 '+escapeHtml(c.loc):'')+'</div></div>'+
+      '<div class="actions">'+
+        '<button class="icon" data-edit="'+c.id+'">Edit</button>'+
+        '<button class="icon" data-del="'+c.id+'" style="color:var(--danger);">Delete</button>'+
+      '</div></div>';
+  }).join("");
+}
+
+document.getElementById("commitList").addEventListener("click", function(e){
+  var editId = e.target.dataset.edit;
+  var delId = e.target.dataset.del;
+  if(delId){
+    state.commitments = state.commitments.filter(function(c){ return c.id!==delId; });
+    saveCommitments(); renderCommitList(); renderSchedule();
+    return;
+  }
+  if(editId){
+    var c = state.commitments.find(function(x){ return x.id===editId; });
+    if(!c) return;
+    state.editingId = c.id;
+    document.getElementById("f-title").value = c.title;
+    document.getElementById("f-type").value = c.type;
+    document.getElementById("f-start").value = c.start;
+    document.getElementById("f-end").value = c.end;
+    document.getElementById("f-loc").value = c.loc||"";
+    document.getElementById("f-notes").value = c.notes||"";
+    document.querySelectorAll("#dayPick input").forEach(function(inp){
+      inp.checked = c.days.indexOf(inp.value)!==-1;
+    });
+    document.getElementById("submitBtn").textContent = "Update commitment";
+    document.getElementById("cancelEdit").style.display = "inline-block";
+    document.querySelectorAll('nav.tabs button').forEach(function(b){b.classList.toggle('active', b.dataset.tab==='add');});
+    document.querySelectorAll('section.tab').forEach(function(s){s.classList.toggle('active', s.id==='tab-add');});
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+});
+
+document.getElementById("cancelEdit").addEventListener("click", function(){
+  resetForm();
+});
+
+function resetForm(){
+  state.editingId = null;
+  document.getElementById("commitForm").reset();
+  document.querySelectorAll("#dayPick input").forEach(function(inp){ inp.checked=false; });
+  document.getElementById("submitBtn").textContent = "Add to board";
+  document.getElementById("cancelEdit").style.display = "none";
+  document.getElementById("formMsg").textContent = "";
+}
+
+document.getElementById("commitForm").addEventListener("submit", function(e){
+  e.preventDefault();
+  var title = document.getElementById("f-title").value.trim();
+  var type = document.getElementById("f-type").value;
+  var start = document.getElementById("f-start").value;
+  var end = document.getElementById("f-end").value;
+  var loc = document.getElementById("f-loc").value.trim();
+  var notes = document.getElementById("f-notes").value.trim();
+  var days = Array.prototype.slice.call(document.querySelectorAll("#dayPick input:checked")).map(function(i){return i.value;});
+  var msg = document.getElementById("formMsg");
+
+  if(!title || !start || !end || days.length===0){
+    msg.textContent = "Add a title, start/end time, and at least one day.";
+    return;
+  }
+  if(toMin(end) <= toMin(start)){
+    msg.textContent = "End time needs to be after start time.";
+    return;
+  }
+  msg.textContent = "";
+
+  if(state.editingId){
+    var c = state.commitments.find(function(x){ return x.id===state.editingId; });
+    if(c){ c.title=title; c.type=type; c.start=start; c.end=end; c.days=days; c.loc=loc; c.notes=notes; }
+  } else {
+    state.commitments.push({id:uid(), title:title, type:type, start:start, end:end, days:days, loc:loc, notes:notes});
+  }
+  saveCommitments();
+  resetForm();
+  renderCommitList();
+  renderSchedule();
+});
+
+/* ============================================================
+   FUEL PLAN
+============================================================ */
+function buildFuelDaySelector(){
+  var el = document.getElementById("fuelDaySelector");
+  el.innerHTML = DAYS.map(function(d){
+    return '<button data-day="'+d+'" class="'+(d===state.fuelDay?'active':'')+'">'+d+'</button>';
+  }).join("");
+}
+document.getElementById("fuelDaySelector").addEventListener("click", function(e){
+  var btn = e.target.closest("button[data-day]");
+  if(!btn) return;
+  state.fuelDay = btn.dataset.day;
+  buildFuelDaySelector();
+  renderFuel();
+});
+
+function mealPeriodFor(min){
+  if(min < 10*60+30) return "breakfast";
+  if(min < 14*60+30) return "lunch";
+  if(min >= 16*60+30) return "dinner";
+  return "lunch";
+}
+
+function findGaps(dayEvents){
+  var sorted = dayEvents.slice().sort(function(a,b){ return a.startMin-b.startMin; });
+  var gaps = [];
+  var cursor = DAY_START;
+  sorted.forEach(function(e){
+    if(e.startMin > cursor + 20){
+      gaps.push({start:cursor, end:e.startMin});
+    }
+    cursor = Math.max(cursor, e.endMin);
+  });
+  if(DAY_END > cursor + 20) gaps.push({start:cursor, end:DAY_END});
+  return gaps.filter(function(g){ return g.end-g.start >= 20; });
+}
+
+function classifyGap(gap, dayEvents){
+  var nextPractice = dayEvents.filter(function(e){ return e.ref.type==="practice" && e.startMin >= gap.end; })
+    .sort(function(a,b){return a.startMin-b.startMin;})[0];
+  var prevPractice = dayEvents.filter(function(e){ return e.ref.type==="practice" && e.endMin <= gap.start; })
+    .sort(function(a,b){return b.endMin-a.endMin;})[0];
+
+  if(nextPractice && nextPractice.startMin - gap.end <= 120){
+    return {kind:"pre", label:"Pre-practice", tag:"pre-workout"};
+  }
+  if(prevPractice && gap.start - prevPractice.endMin <= 90){
+    return {kind:"rec", label:"Recovery", tag:"recovery"};
+  }
+  return {kind:"meal", label: capitalize(mealPeriodFor(gap.start)), tag:null};
+}
+function capitalize(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+function minToClock(min){
+  var h = Math.floor(min/60), m = min%60;
+  var ap = h>=12?"PM":"AM"; var h12=h%12; if(h12===0)h12=12;
+  return h12+(m?":"+String(m).padStart(2,"0"):"")+" "+ap;
+}
+
+function allDiningItems(){
+  var all = [];
+  DINING_HALLS.forEach(function(hall){
+    hall.items.forEach(function(item){
+      all.push(Object.assign({hall:hall.nick, hallFull:hall.name}, item));
+    });
+  });
+  return all;
+}
+
+function dailyTargets(lb, load){
+  var kg = lb/2.2046;
+  var carbPerKg = load==="hard" ? [6,8] : load==="moderate" ? [4,6] : [3,4];
+  var calPerKg = load==="hard" ? [34,42] : load==="moderate" ? [30,36] : [26,30];
+  return {
+    protein:[kg*1.6, kg*2.2],
+    carbs:[kg*carbPerKg[0], kg*carbPerKg[1]],
+    calories:[kg*calPerKg[0], kg*calPerKg[1]]
+  };
+}
+
+function mealGoal(profile){
+  if(!profile || profile.weight===null) return null;
+  var daily = dailyTargets(profile.weight, profile.load);
+  return {
+    protein:Math.round((daily.protein[0]+daily.protein[1])/2/MEALS_PER_DAY),
+    carbs:Math.round((daily.carbs[0]+daily.carbs[1])/2/MEALS_PER_DAY)
+  };
+}
+
+function goalDistance(item, goal){
+  return Math.abs(item.protein-goal.protein)/goal.protein + Math.abs(item.carbs-goal.carbs)/goal.carbs;
+}
+
+function suggestFor(gap, classification, goal){
+  var meal = mealPeriodFor(gap.start);
+  var pool = allDiningItems().filter(function(it){ return it.meal===meal; });
+
+  if(classification.tag){
+    var tagged = pool.filter(function(it){ return it.tags.indexOf(classification.tag)!==-1; });
+    if(tagged.length>=3) pool = tagged;
+    else if(tagged.length>0) pool = tagged.concat(pool.filter(function(it){return tagged.indexOf(it)===-1;}));
+  }
+  // shuffle deterministically-ish by name length so it feels varied but stable
+  pool = pool.slice().sort(function(a,b){ return (a.name.length%7) - (b.name.length%7); });
+  if(goal){
+    pool.sort(function(a,b){ return goalDistance(a,goal) - goalDistance(b,goal); });
+  }
+  return pool.slice(0,3);
+}
+
+function profileLabel(profile){
+  return profile.weight+" lb, "+LOAD_LABELS[profile.load];
+}
+
+function renderFuelChange(goal, changedCount, shownCount){
+  var el = document.getElementById("fuel-change");
+  var before = state.previousProfile;
+  if(!goal){ el.textContent = ""; return; }
+  if(!before || before.weight===null){
+    el.textContent = "Goal for each meal: about "+goal.protein+" g protein and "+goal.carbs+" g carbs ("+profileLabel(state.profile)+").";
+    return;
+  }
+  var goalBefore = mealGoal(before);
+  var foods = "";
+  if(shownCount>0){
+    foods = changedCount>0
+      ? changedCount+" of "+shownCount+" foods changed on "+DAY_FULL[state.fuelDay]+" (marked New)."
+      : "The same foods are still the closest match on "+DAY_FULL[state.fuelDay]+".";
+  }
+  el.textContent = profileLabel(before)+" \u2192 "+profileLabel(state.profile)+": each meal goal goes from "+
+    goalBefore.protein+" to "+goal.protein+" g protein and "+goalBefore.carbs+" to "+goal.carbs+" g carbs. "+foods;
+}
+
+function renderFuel(){
+  buildFuelDaySelector();
+  var goal = mealGoal(state.profile);
+  var goalBefore = mealGoal(state.previousProfile);
+  var byDay = expandByDay();
+  var dayEvents = layoutDay(byDay[state.fuelDay]);
+  var gaps = findGaps(dayEvents);
+  var el = document.getElementById("gapResults");
+
+  var changedCount = 0, shownCount = 0;
+  renderFuelChange(goal, 0, 0);
+
+  if(dayEvents.length===0){
+    el.innerHTML = '<p class="empty-note">' + DAY_FULL[state.fuelDay] + ' is wide open \u2014 nothing scheduled.</p>';
+    return;
+  }
+  if(gaps.length===0){
+    el.innerHTML = '<p class="empty-note">' + DAY_FULL[state.fuelDay] + ' is fully booked. Try a portable snack between blocks.</p>';
+    return;
+  }
+
+  el.innerHTML = gaps.map(function(gap, idx){
+    var cls = classifyGap(gap, dayEvents);
+    var items = suggestFor(gap, cls, goal);
+    var itemsBefore = goalBefore ? suggestFor(gap, cls, goalBefore) : items;
+    var namesBefore = itemsBefore.map(function(it){ return it.name; });
+    shownCount += items.length;
+    var labelCls = cls.kind==="pre" ? "pre-tag" : cls.kind==="rec" ? "rec-tag" : "";
+    var goalHtml = goal ? '<p class="gap-goal">Aim for about '+goal.protein+' g protein and '+goal.carbs+' g carbs</p>' : '';
+    var foodHtml = items.length ? items.map(function(it){
+      var isNew = namesBefore.indexOf(it.name)===-1;
+      if(isNew) changedCount++;
+      return '<div class="food-card">'+(isNew ? '<span class="new-pick">New</span>' : '')+'<p class="name">'+escapeHtml(it.name)+'</p>'+
+        '<p class="from">'+escapeHtml(it.hall)+' \u00b7 '+escapeHtml(it.station)+'</p>'+
+        '<div class="macro-row"><span class="macro">'+it.cal+' cal</span><span class="macro">'+it.protein+'g pro</span><span class="macro">'+it.carbs+'g carb</span><span class="macro">'+it.fat+'g fat</span></div>'+
+        '<div class="food-tags">'+it.tags.map(function(t){return '<span>'+t+'</span>';}).join("")+'</div>'+
+        '</div>';
+    }).join("") : '<p class="empty-note">No matches.</p>';
+
+    return '<details class="acc gap-card"'+(idx===0?' open':'')+'>'+
+      '<summary><span class="label tagpill '+labelCls+'" style="font-size:16px;padding:4px 10px;">'+cls.label+'</span>'+
+      '<span class="window">'+minToClock(gap.start)+' \u2013 '+minToClock(gap.end)+'</span><span class="chev">\u2304</span></summary>'+
+      '<div class="acc-body suggest-grid" style="padding-top:0;">'+goalHtml+foodHtml+'</div>'+
+      '</details>';
+  }).join("");
+  renderFuelChange(goal, changedCount, shownCount);
+}
+
+/* ============================================================
+   FUEL PROFILE (weight + training load)
+============================================================ */
+function updateProfile(weight, load){
+  var current = state.profile;
+  if(weight===current.weight && load===current.load) return;
+  if(current.weight!==null){
+    state.previousProfile = {weight:current.weight, load:current.load};
+  }
+  state.profile = {weight:weight, load:load};
+  saveProfile();
+  renderProfileInputs();
+  renderCalc();
+  renderFuel();
+}
+
+function renderProfileInputs(){
+  var weightText = state.profile.weight===null ? "" : String(state.profile.weight);
+  var fuelWeight = document.getElementById("fuel-weight");
+  if(fuelWeight.value!==weightText) fuelWeight.value = weightText;
+  document.getElementById("c-weight").value = weightText;
+  document.getElementById("fuel-load").value = state.profile.load;
+  document.getElementById("c-load").value = state.profile.load;
+  document.getElementById("fuel-weight-message").textContent =
+    state.profile.weight===null ? "Enter your weight to see a goal for each meal." : "";
+}
+
+function applyWeightText(text, load){
+  var trimmed = text.trim();
+  var message = document.getElementById("fuel-weight-message");
+  if(trimmed===""){
+    updateProfile(null, load);
+    return;
+  }
+  var lb = Number(trimmed);
+  if(!isValidWeight(lb)){
+    message.textContent = "Enter a weight from "+MIN_WEIGHT_LB+" to "+MAX_WEIGHT_LB+" lb.";
+    return;
+  }
+  updateProfile(lb, load);
+  message.textContent = "";
+}
+
+document.getElementById("fuel-weight").addEventListener("input", function(e){
+  applyWeightText(e.target.value, state.profile.load);
+});
+document.getElementById("fuel-load").addEventListener("change", function(e){
+  updateProfile(state.profile.weight, e.target.value);
+});
+
+/* ============================================================
+   DINING DIRECTORY
+============================================================ */
+function buildHallFilterOptions(){
+  var sel = document.getElementById("filterHall");
+  DINING_HALLS.forEach(function(h){
+    var o = document.createElement("option");
+    o.value = h.id; o.textContent = h.nick;
+    sel.appendChild(o);
+  });
+}
+
+function renderDirectory(){
+  var hallFilter = document.getElementById("filterHall").value;
+  var mealFilter = document.getElementById("filterMeal").value;
+  var tagFilter = document.getElementById("filterTag").value;
+  var el = document.getElementById("diningDirectory");
+
+  var halls = DINING_HALLS.filter(function(h){ return hallFilter==="all" || h.id===hallFilter; });
+  var html = "";
+  halls.forEach(function(h){
+    var items = h.items.filter(function(it){
+      return (mealFilter==="all" || it.meal===mealFilter) && (tagFilter==="all" || it.tags.indexOf(tagFilter)!==-1);
+    });
+    if(items.length===0) return;
+    var openAttr = hallFilter!=="all" ? " open" : "";
+    html += '<details class="acc"'+openAttr+'><summary><span class="hall-name">'+h.name+' <span class="addr">'+h.addr+'</span></span><span class="chev">\u2304</span></summary>';
+    html += '<div class="acc-body hall-grid">';
+    items.forEach(function(it){
+      html += '<div class="food-card"><p class="name">'+escapeHtml(it.name)+'</p>'+
+        '<p class="from">'+escapeHtml(it.station)+' \u00b7 '+capitalize(it.meal)+'</p>'+
+        '<div class="macro-row"><span class="macro">'+it.cal+' cal</span><span class="macro">'+it.protein+'g pro</span><span class="macro">'+it.carbs+'g carb</span><span class="macro">'+it.fat+'g fat</span></div>'+
+        '<div class="food-tags">'+it.tags.map(function(t){return '<span>'+t+'</span>';}).join("")+'</div>'+
+        '</div>';
+    });
+    html += '</div></details>';
+  });
+  el.innerHTML = html || '<p class="empty-note">No matches.</p>';
+}
+["filterHall","filterMeal","filterTag"].forEach(function(id){
+  document.getElementById(id).addEventListener("change", renderDirectory);
+});
+
+/* ============================================================
+   FUEL TARGET CALCULATOR
+============================================================ */
+function renderCalc(){
+  var resEl = document.getElementById("calcResult");
+  if(state.profile.weight===null){
+    resEl.innerHTML = '<p class="empty-note" style="padding:0;">Enter weight to see ranges.</p>';
+    return;
+  }
+  var daily = dailyTargets(state.profile.weight, state.profile.load);
+  function range(pair){ return pair[0].toFixed(0)+'\u2013'+pair[1].toFixed(0); }
+  resEl.innerHTML =
+    '<div class="result-chip"><div class="num">'+range(daily.calories)+'</div><div class="lbl">Calories / day</div></div>'+
+    '<div class="result-chip"><div class="num">'+range(daily.protein)+'g</div><div class="lbl">Protein / day</div></div>'+
+    '<div class="result-chip"><div class="num">'+range(daily.carbs)+'g</div><div class="lbl">Carbs / day</div></div>';
+}
+
+document.getElementById("calcBtn").addEventListener("click", function(){
+  var load = document.getElementById("c-load").value;
+  var lb = Number(document.getElementById("c-weight").value.trim());
+  if(!isValidWeight(lb)){
+    document.getElementById("calcResult").innerHTML =
+      '<p class="empty-note" style="padding:0;">Enter a weight from '+MIN_WEIGHT_LB+' to '+MAX_WEIGHT_LB+' lb.</p>';
+    return;
+  }
+  updateProfile(lb, load);
+  renderCalc();
+});
+
+/* ============================================================
+   INIT
+============================================================ */
+function init(){
+  loadCommitments();
+  loadProfile();
+  buildDayPick();
+  buildHallFilterOptions();
+  renderSchedule();
+  renderCommitList();
+  renderDirectory();
+  buildFuelDaySelector();
+  renderProfileInputs();
+}
+init();
+
+})();
+</script>
+</body>
+</html>
