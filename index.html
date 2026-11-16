@@ -186,6 +186,7 @@ p.section-sub{margin:0 0 18px;color:var(--ink-soft);font-size:14px;font-weight:6
 .day-detail-row.free .what{color:var(--ink-soft);}
 .day-detail-row.free .what > small{font-style:italic;}
 .day-detail-row .gap-meal{margin-top:4px;font-size:13px;font-weight:700;color:var(--turf);}
+.gap-meal .done-btn{margin-left:6px;padding:2px 8px;font-size:12px;}
 .idea-select{display:block;width:100%;max-width:320px;margin-top:6px;font:inherit;font-size:13.5px;font-weight:600;
   padding:6px 8px;color:var(--ink);background:var(--surface);border:2px solid var(--ink);cursor:pointer;}
 .custom-form{margin-top:8px;padding:10px 12px;border:1.5px solid var(--line);background:var(--surface);max-width:320px;color:var(--ink);}
@@ -841,6 +842,7 @@ var ACTIVITY_PICKS_KEY = STORAGE_PREFIX + "illini-playbook-activity-picks-v1";
 var ACTIVITY_DONE_KEY = STORAGE_PREFIX + "illini-playbook-activity-done-v1";
 var CUSTOM_IDEAS_KEY = STORAGE_PREFIX + "illini-playbook-custom-ideas-v1";
 var SEASON_KEY = STORAGE_PREFIX + "illini-playbook-season-v1";
+var MEAL_EATEN_KEY = STORAGE_PREFIX + "illini-playbook-meal-eaten-v1";
 if (IS_TEST_COPY) {
   var testBanner = document.createElement("p");
   testBanner.className = "test-copy-banner";
@@ -880,7 +882,8 @@ var state = {
   activityDone: {},   // done key (date + gap key + idea) -> true
   customIdeas: {},    // gap key -> {name, minutes, group} the user typed in for that gap
   customFormGap: null, // gap key whose "Something else" form is open, or null
-  season: "in"         // "in" or "out" of season, for the NCAA hour limit
+  season: "in",        // "in" or "out" of season, for the NCAA hour limit
+  mealEaten: {}        // eaten key (date + gap key + food) -> true
 };
 
 function loadCommitments(){
@@ -1221,6 +1224,17 @@ function customForm(key, gapMinutes){
     '</div>';
 }
 
+// Eaten works like done: saved with this week's date and the food's name.
+function loadMealEaten(){ state.mealEaten = loadPickMap(MEAL_EATEN_KEY); }
+
+function toggleMealEaten(key){
+  var eaten = doneKey(key.split("|")[0], key, state.mealPicks[key]);
+  if(state.mealEaten[eaten]) delete state.mealEaten[eaten];
+  else state.mealEaten[eaten] = true;
+  savePickMap(MEAL_EATEN_KEY, state.mealEaten);
+  renderSchedule();
+}
+
 function toggleActivityDone(key){
   var day = key.split("|")[0];
   var done = doneKey(day, key, state.activityPicks[key]);
@@ -1275,16 +1289,23 @@ function followThrough(weeksBack){
   var byDay = expandByDay();
   var lastDayIdx = weeksBack===0 ? (new Date().getDay()+6)%7 : DAYS.length-1;
   var doneKeys = Object.keys(state.activityDone);
+  var eatenKeys = Object.keys(state.mealEaten);
   var weekDates = DAYS.map(function(d){ return dateOfThisWeek(d, weeksBack); });
-  var result = {planned:0, done:0, groups:{}, missedDays:{},
-    hasCheckins: doneKeys.some(function(k){ return weekDates.indexOf(k.split("|")[0])>=0; })};
+  var inWeek = function(k){ return weekDates.indexOf(k.split("|")[0])>=0; };
+  var result = {planned:0, done:0, groups:{}, missedDays:{}, meals:{planned:0, done:0}, skippedMealDays:{},
+    hasCheckins: doneKeys.some(inWeek) || eatenKeys.some(inWeek)};
   IDEA_GROUPS.forEach(function(group){ result.groups[group] = {planned:0, done:0}; result.missedDays[group] = {}; });
   DAYS.slice(0, lastDayIdx+1).forEach(function(d){
     findGaps(byDay[d]).forEach(function(g){
       var key = gapKey(d, g);
+      var prefix = dateOfThisWeek(d, weeksBack)+"|"+key+"|";
+      if(state.mealPicks[key]){
+        result.meals.planned++;
+        if(eatenKeys.some(function(k){ return k.indexOf(prefix)===0; })) result.meals.done++;
+        else result.skippedMealDays[d] = (result.skippedMealDays[d]||0)+1;
+      }
       var idea = pickedIdeaFor(key);
       if(!idea) return;
-      var prefix = dateOfThisWeek(d, weeksBack)+"|"+key+"|";
       var done = doneKeys.some(function(k){ return k.indexOf(prefix)===0; });
       result.planned++; result.groups[idea.group].planned++;
       if(done){ result.done++; result.groups[idea.group].done++; }
@@ -1302,30 +1323,42 @@ function weekLabel(weeksBack){
 }
 
 // Tips from last week's check-ins: the group done least, and the day it was missed most.
+// The day with the most misses in a {day: count} map.
+function mostMissedDay(misses){
+  return Object.keys(misses).sort(function(a,b){ return misses[b]-misses[a]; })[0];
+}
+
 function followThroughTips(last){
-  if(!last.hasCheckins || last.planned===0) return [];
-  if(last.done===last.planned) return [{day:null, good:true, text:"You did all "+last.planned+" plans last week"}];
+  if(!last.hasCheckins) return [];
+  var tips = [];
+  var skipped = last.meals.planned-last.meals.done;
+  if(skipped>0){
+    var skipDay = mostMissedDay(last.skippedMealDays);
+    tips.push({day:skipDay, text:"Skipped "+skipped+" picked meal"+(skipped===1?"":"s")+" last week; most on "+DAY_FULL[skipDay]});
+  }
+  if(last.planned===0) return tips;
+  if(last.done===last.planned) return tips.concat([{day:null, good:true, text:"You did all "+last.planned+" plans last week"}]);
   var worst = IDEA_GROUPS.filter(function(g){ return last.groups[g].planned > last.groups[g].done; })
     .sort(function(a,b){ return last.groups[a].done/last.groups[a].planned - last.groups[b].done/last.groups[b].planned; })[0];
-  var misses = last.missedDays[worst];
-  var day = Object.keys(misses).sort(function(a,b){ return misses[b]-misses[a]; })[0];
-  return [{day:day, text:FOLLOW_GROUP_WORDS[worst]+" done "+last.groups[worst].done+" of "+last.groups[worst].planned+
-    " last week; most missed on "+DAY_FULL[day]}];
+  var day = mostMissedDay(last.missedDays[worst]);
+  return tips.concat([{day:day, text:FOLLOW_GROUP_WORDS[worst]+" done "+last.groups[worst].done+" of "+last.groups[worst].planned+
+    " last week; most missed on "+DAY_FULL[day]}]);
 }
 
 function renderFollowThrough(last, now){
   var cell = function(week, part){
-    var counts = part ? week.groups[part] : week;
+    var counts = part==="meals" ? week.meals : part ? week.groups[part] : week;
     return counts.planned ? counts.done+" of "+counts.planned : "\u2014";
   };
-  var rows = [{label:"Plans done", part:null}].concat(IDEA_GROUPS.map(function(g){ return {label:IDEA_GROUP_NAMES[g], part:g}; }));
+  var rows = [{label:"Plans done", part:null}].concat(IDEA_GROUPS.map(function(g){ return {label:IDEA_GROUP_NAMES[g], part:g}; }))
+    .concat([{label:"Meals eaten", part:"meals"}]);
   document.getElementById("recapFollow").innerHTML =
     '<div class="grid-scroll"><table class="recap-table"><thead><tr><th></th>'+
       '<th>Last week<small>'+weekLabel(1)+'</small></th><th>This week so far<small>'+weekLabel(0)+'</small></th></tr></thead><tbody>'+
     rows.map(function(r){
       return '<tr><td><b>'+r.label+'</b></td><td>'+(last.hasCheckins ? cell(last, r.part) : "\u2014")+'</td><td>'+cell(now, r.part)+'</td></tr>';
     }).join("")+'</tbody></table></div>'+
-    (last.hasCheckins ? '' : '<p class="recap-note">Last week has no check-ins yet. Tap <b>Mark done</b> in a day\u2019s panel, and next Monday this fills in.</p>');
+    (last.hasCheckins ? '' : '<p class="recap-note">Last week has no check-ins yet. Tap <b>Mark done</b> or <b>Mark eaten</b> in a day\u2019s panel, and next Monday this fills in.</p>');
 }
 
 function hoursText(mins){ return mins ? lengthText(mins) : "0h"; }
@@ -1434,7 +1467,7 @@ function renderDayDetail(byDay){
       '<div class="time">'+minToClock(g.start)+'\u2013'+minToClock(g.end)+'</div>'+
       '<div class="swatch"></div>'+
       '<div class="what">Free \u00b7 '+lengthText(g.end-g.start)+' <small>'+classifyGap(g, events).label+' window</small>'+
-        (meal ? '<div class="gap-meal">Meal: '+escapeHtml(meal)+'</div>' : '')+
+        (meal ? mealLine(key, meal, state.mealEaten[doneKey(day, key, meal)]) : '')+
         '<select class="idea-select'+(picked?' is-picked':'')+'" data-idea-gap="'+escapeAttr(key)+'" aria-label="Something to do '+minToClock(g.start)+' to '+minToClock(g.end)+'">'+
           '<option value="">Pick something to do\u2026</option>'+
           ideas.map(function(idea){
@@ -1455,6 +1488,12 @@ function renderDayDetail(byDay){
     '<div class="day-detail-head"><h3>'+DAY_FULL[day]+'</h3>'+
     '<button type="button" class="btn secondary" data-close-day>Close</button></div>'+
     body+'</div>';
+}
+
+function mealLine(key, meal, isEaten){
+  return '<div class="gap-meal">Meal: '+escapeHtml(meal)+
+    ' <button type="button" class="done-btn'+(isEaten?' is-done':'')+'" data-eaten-gap="'+escapeAttr(key)+'" aria-pressed="'+!!isEaten+'">'+
+    (isEaten ? '\u2713 Eaten' : 'Mark eaten')+'</button></div>';
 }
 
 function doneButton(key, isDone){
@@ -2069,6 +2108,7 @@ function init(){
   loadActivityDone();
   loadCustomIdeas();
   loadSeason();
+  loadMealEaten();
   buildDayPick();
   buildHallFilterOptions();
   renderSchedule();
@@ -2098,6 +2138,8 @@ function init(){
   });
   document.getElementById("dayDetail").addEventListener("click", function(ev){
     if(ev.target.closest("[data-close-day]")) toggleDay(state.selectedDay);
+    var eatenBtn = ev.target.closest("[data-eaten-gap]");
+    if(eatenBtn) toggleMealEaten(eatenBtn.dataset.eatenGap);
     var doneBtn = ev.target.closest("[data-done-gap]");
     if(doneBtn) toggleActivityDone(doneBtn.dataset.doneGap);
     if(ev.target.closest("[data-custom-save]")) saveCustomIdea(ev.target.closest(".custom-form"));
