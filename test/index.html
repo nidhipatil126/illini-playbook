@@ -148,17 +148,71 @@ p.section-sub{margin:0 0 18px;color:var(--ink-soft);font-size:14px;font-weight:6
 
 /* ============ STRESS SNAPSHOT ============ */
 .snapshot{
-  display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:26px;
+  display:grid;grid-template-columns:repeat(7,1fr);gap:16px 10px;margin-bottom:26px;
 }
-/* Display only, not tappable: no box border, so it doesn't read as a button. */
+/* Tappable: raised like the other buttons. Tapping a day opens its details below. */
 .snap-day{
-  padding:10px 8px 8px;text-align:center;border-bottom:3px solid transparent;
+  font:inherit;color:inherit;width:100%;cursor:pointer;position:relative;
+  padding:10px 8px 8px;text-align:center;border:2px solid var(--ink);
+  background:var(--day-tile, var(--surface));box-shadow:var(--shadow);
 }
-.snap-day.busiest{border-bottom-color:var(--orange);}
+.snap-day:hover{background:var(--surface);}
+/* Tags on a box's top edge: Today (navy) and Busiest (orange). Orange outline still means "tapped". */
+.snap-day .tile-tags{
+  position:absolute;top:-10px;left:50%;transform:translateX(-50%);
+  display:flex;gap:3px;white-space:nowrap;
+}
+.snap-day .busy-tag,
+.snap-day .today-tag{
+  color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.5px;
+  text-transform:uppercase;padding:2px 6px;
+}
+.snap-day .busy-tag{background:var(--orange);}
+.snap-day .today-tag{background:var(--navy);}
+.snap-day.selected{
+  border:3px solid var(--orange);
+  background:color-mix(in srgb, var(--orange) 22%, var(--day-tile, var(--surface)));
+}
+
+/* The open day's details: display only, so flat. */
+.day-detail{border:2px solid var(--line);background:var(--day-tile, var(--surface));padding:14px 16px 10px;margin:-10px 0 26px;}
+.day-detail-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;}
+.day-detail-head h3{margin:0;font-family:var(--font-display);font-size:24px;font-weight:600;line-height:1.1;}
+.day-detail-row{display:flex;align-items:stretch;gap:10px;padding:6px 0;border-top:1px solid var(--line);font-size:14px;}
+.day-detail-row .time{flex:none;width:122px;color:var(--ink-soft);font-weight:600;font-size:13px;white-space:nowrap;}
+.day-detail-row .swatch{width:8px;flex:none;}
+.day-detail-row .what{flex:1;min-width:0;}
+.day-detail-row .what small{display:block;color:var(--ink-soft);font-size:12px;}
+.day-detail-row.free .what{color:var(--ink-soft);}
+.day-detail-row.free .what > small{font-style:italic;}
+.day-detail-row .gap-meal{margin-top:4px;font-size:13px;font-weight:700;color:var(--turf);}
+.idea-select{display:block;width:100%;max-width:320px;margin-top:6px;font:inherit;font-size:13.5px;font-weight:600;
+  padding:6px 8px;color:var(--ink);background:var(--surface);border:2px solid var(--ink);cursor:pointer;}
+.custom-form{margin-top:8px;padding:10px 12px;border:1.5px solid var(--line);background:var(--surface);max-width:320px;color:var(--ink);}
+.custom-form label{display:block;margin-bottom:8px;}
+.custom-form input[type=text]{margin-top:4px;}
+.custom-minutes{display:flex;align-items:center;gap:6px;margin-top:4px;text-transform:none;font-size:14px;color:var(--ink);}
+.custom-minutes input{width:80px;padding:6px 8px;font:inherit;border:2px solid var(--ink);background:var(--surface);color:var(--ink);}
+.custom-form fieldset{border:0;margin:0 0 4px;padding:0;display:flex;flex-wrap:wrap;gap:4px 14px;}
+.custom-form legend{font-size:12.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px;padding:0;width:100%;}
+.custom-form .custom-group{display:inline-flex;align-items:center;gap:5px;margin:0;text-transform:none;font-size:14px;color:var(--ink);letter-spacing:0;}
+.custom-error{margin:4px 0 8px;font-size:13px;font-weight:700;color:var(--danger);}
+.custom-error:empty{display:none;}
+.custom-actions{display:flex;gap:8px;}
+.custom-actions .btn{font-size:16px;padding:5px 14px 3px;}
+.idea-select.is-picked{border-color:var(--turf);background:color-mix(in srgb, var(--turf) 14%, var(--surface));color:var(--turf-2);}
+/* "Mark done" sits on its own line under the ideas, so it is never mistaken for one of them. */
+.done-row{margin-top:8px;}
+.done-btn{font:inherit;font-size:12.5px;font-weight:700;padding:4px 10px;cursor:pointer;
+  background:transparent;color:var(--ink);border:1.5px dashed var(--ink-soft);}
+.done-btn.is-done{background:var(--turf);color:#fff;border:1.5px solid var(--turf-2);}
+.day-detail-row.free .swatch{border:1.5px dashed var(--ink-soft);}
 .snap-day .d{font-family:var(--font-display);font-size:19px;letter-spacing:1px;color:var(--ink-soft);}
 .snap-day .bar-track{height:56px;display:flex;align-items:flex-end;justify-content:center;margin:6px 0;}
 .snap-day .bar{width:16px;background:var(--navy);}
 .snap-day.busiest .bar{background:var(--orange);}
+.snap-day .bar-track .free-label{align-self:center;font-size:12px;font-weight:700;color:var(--ink-soft);}
+.free-col-label{position:absolute;top:40px;left:0;right:0;text-align:center;font-size:12px;font-weight:700;color:var(--ink-soft);}
 .snap-day .hrs{font-size:11.5px;color:var(--ink-soft);}
 
 /* ============ CONFLICTS BANNER ============ */
@@ -222,6 +276,12 @@ p.section-sub{margin:0 0 18px;color:var(--ink-soft);font-size:14px;font-weight:6
 .type-club{background:var(--turf);color:#fff;}
 .type-interview{background:var(--purple);color:#fff;}
 .type-other{background:#6B6F7A;color:#fff;}
+.type-lift{background:#8E2F14;color:#fff;}
+.type-game{background:#8A6100;color:#fff;}
+.type-film{background:#1F6F78;color:#fff;}
+.type-treatment{background:#2F6DA3;color:#fff;}
+.type-travel{background:#4E5D3A;color:#fff;}
+.type-studyhall{background:#3E4FA0;color:#fff;}
 
 .legend{display:flex;gap:16px;flex-wrap:wrap;margin:14px 0 0;font-size:12.5px;color:var(--ink-soft);}
 .legend span{display:inline-flex;align-items:center;gap:6px;}
@@ -309,6 +369,20 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .fuel-weight-message{margin:6px 0 0;font-size:13px;font-weight:700;color:var(--danger);min-height:1.2em;}
 .fuel-change{margin:8px 0 0;font-size:14px;font-weight:700;}
 .gap-goal{grid-column:1/-1;margin:12px 0 0;font-weight:700;font-size:14px;}
+/* Pick buttons are real buttons, so they get the raised look; the food card itself stays flat. */
+.pick-btn{
+  margin-top:10px;font-family:var(--font-body);font-size:13px;font-weight:700;
+  background:var(--surface);color:var(--ink);border:2px solid var(--ink);
+  padding:5px 12px;cursor:pointer;box-shadow:2px 2px 0 var(--ink);
+}
+.pick-btn:hover{background:var(--surface-2);}
+.pick-btn.is-picked{background:var(--turf);color:#fff;border-color:var(--turf-2);}
+.food-card.picked{border-left:5px solid var(--turf);}
+.more-row{grid-column:1/-1;}
+.more-row .pick-btn{margin-top:0;}
+.picked-note{flex-basis:100%;order:3;font-family:var(--font-body);font-size:13px;font-weight:700;color:var(--turf);letter-spacing:0;}
+:root[data-theme="dark"] .picked-note{color:#8FD3A6;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .picked-note{color:#8FD3A6;}}
 .new-pick{
   display:inline-block;margin-bottom:6px;padding:1px 7px;font-size:10.5px;font-weight:800;letter-spacing:.4px;
   text-transform:uppercase;background:var(--turf);color:#fff;
@@ -361,6 +435,74 @@ details.acc .acc-body{padding:14px 16px;}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .result-chip .num{color:#EDEFF5;}}
 .result-chip .lbl{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;font-weight:700;}
 
+/* ============ HOW IT WORKS TAB (display only, so flat) ============ */
+/* A dimmer warm gray page so the app isn't glaring, used in both light and dark device modes
+   (showTab sets data-theme="light" on these tabs). How it works has its own dark scheme. */
+:root[data-view="schedule"],
+:root[data-view="add"],
+:root[data-view="fuel"],
+:root[data-view="dining"],
+:root[data-view="recap"]{
+  --bg:#B1AA9A;
+  --surface:#BBB4A4;
+  --surface-2:#A49D8D;
+  --day-tile:#CCC6B7;
+  --ink-soft:#30333A;
+  --line:rgba(19,41,75,0.32);
+}
+
+/* How it works uses a softer dark scheme than full dark mode, with panels clearly lighter than the page. */
+:root[data-theme="dark"][data-view="info"]{
+  --bg:#2B3040;
+  --surface:#434B60;
+  --surface-2:#525B72;
+  --ink-soft:#C9CCD6;
+  --line:rgba(236,232,220,0.3);
+}
+
+/* Each numbered section is its own panel so the splits are obvious. Flat (no shadow): not tappable. */
+/* ============ RECAP TAB (numbers are display only, so flat; only "Plan" buttons are raised) ============ */
+.recap-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px;}
+.recap-stat{border:1.5px solid var(--line);background:var(--day-tile, var(--surface));padding:12px 14px;}
+.recap-stat .label{font-size:12px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--ink-soft);}
+.recap-stat .value{font-family:var(--font-display);font-size:30px;line-height:1.1;margin-top:4px;}
+.recap-stat .detail{font-size:12.5px;color:var(--ink-soft);}
+.recap-heading{font-family:var(--font-display);font-size:24px;font-weight:600;margin:0 0 8px;line-height:1.1;}
+.recap-tips{margin:0 0 24px;padding:0 0 0 20px;}
+.recap-tips li{padding:5px 0;font-size:14.5px;}
+.recap-tips li::marker{color:var(--orange);}
+.recap-tips li.good::marker{color:var(--turf);}
+.recap-tips .pick-btn{margin:0 0 0 8px;padding:2px 8px;font-size:12px;vertical-align:middle;}
+.recap-table{width:100%;border-collapse:collapse;font-size:14px;background:var(--day-tile, var(--surface));}
+.recap-table th,.recap-table td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;}
+.recap-table th{font-size:12px;text-transform:uppercase;letter-spacing:.3px;color:var(--ink-soft);}
+.recap-table th small{display:block;text-transform:none;letter-spacing:0;font-weight:600;}
+#recapFollow{margin-bottom:24px;}
+#recapHours{margin-bottom:24px;padding:14px 16px;border:1.5px solid var(--line);background:var(--day-tile, var(--surface));}
+.season-switch{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+.season-switch .pick-btn{margin-top:0;}
+.hours-total{font-size:14px;color:var(--ink-soft);}
+.hours-value{font-family:var(--font-display);font-size:30px;color:var(--ink);}
+.hours-bar{height:12px;border:1.5px solid var(--ink);background:var(--surface);margin:6px 0 8px;}
+.hours-bar div{height:100%;background:var(--turf);}
+.hours-bar.near div{background:#B8860B;}
+.hours-bar.over div{background:var(--danger);}
+.hours-status{margin:2px 0;font-size:14px;font-weight:700;}
+.hours-status.ok{color:var(--turf-2);}
+.hours-status.near{color:#7A5800;}
+.hours-status.over{color:var(--danger);}
+.recap-note{margin:8px 0 0;font-size:13.5px;color:var(--ink-soft);}
+@media (max-width:560px){ .recap-stats{grid-template-columns:1fr;} }
+
+.info-section{background:var(--surface);border-left:5px solid var(--orange);padding:16px 20px 8px;margin-bottom:22px;max-width:76ch;}
+.info-section h3{font-family:var(--font-display);font-size:25px;font-weight:600;letter-spacing:.3px;margin:0 0 6px;line-height:1.1;color:var(--navy);}
+:root[data-theme="dark"] .info-section h3{color:#EDEFF5;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .info-section h3{color:#EDEFF5;}}
+.info-section p,.info-section li{font-size:14.5px;}
+.info-section ol,.info-section ul{padding-left:22px;}
+.info-section li{margin-bottom:6px;}
+.info-formula{display:block;font-family:ui-monospace,Menlo,monospace;font-size:13.5px;background:var(--surface-2);padding:8px 12px;margin:8px 0;overflow-x:auto;}
+
 footer.foot{
   text-align:center;color:var(--ink-soft);font-size:12px;padding:30px 20px 10px;
 }
@@ -386,6 +528,8 @@ footer.foot{
       <button data-tab="add">Add</button>
       <button data-tab="fuel">Fuel</button>
       <button data-tab="dining">Dining</button>
+      <button data-tab="recap">Recap</button>
+      <button data-tab="info">How it works</button>
     </nav>
   </div>
 </header>
@@ -395,9 +539,10 @@ footer.foot{
   <!-- ============ SCHEDULE TAB ============ -->
   <section class="tab active" id="tab-schedule">
     <h2 class="section-title">Weekly board</h2>
-    <p class="section-sub">Hazard borders mark conflicts.</p>
+    <p class="section-sub">Tap a day to see its plan and free time. Red striped outlines mean two commitments overlap.</p>
 
     <div class="snapshot" id="snapshot"></div>
+    <div id="dayDetail"></div>
 
     <div id="conflictBanner"></div>
 
@@ -406,11 +551,17 @@ footer.foot{
     </div>
 
     <div class="legend">
-      <span><i style="background:var(--orange)"></i> Practice</span>
-      <span><i style="background:var(--navy)"></i> Class</span>
-      <span><i style="background:var(--turf)"></i> Club</span>
-      <span><i style="background:var(--purple)"></i> Interview</span>
-      <span><i style="background:#6B6F7A"></i> Other</span>
+      <span><i class="type-practice"></i> Practice</span>
+      <span><i class="type-lift"></i> Lift</span>
+      <span><i class="type-game"></i> Game / meet</span>
+      <span><i class="type-film"></i> Film</span>
+      <span><i class="type-treatment"></i> Treatment</span>
+      <span><i class="type-travel"></i> Travel</span>
+      <span><i class="type-class"></i> Class</span>
+      <span><i class="type-studyhall"></i> Study hall</span>
+      <span><i class="type-club"></i> Club</span>
+      <span><i class="type-interview"></i> Interview</span>
+      <span><i class="type-other"></i> Other</span>
     </div>
   </section>
 
@@ -429,7 +580,13 @@ footer.foot{
           <label for="f-type">Type</label>
           <select id="f-type">
             <option value="practice">Practice</option>
+            <option value="lift">Lift</option>
+            <option value="game">Game / meet</option>
+            <option value="film">Film</option>
+            <option value="treatment">Treatment</option>
+            <option value="travel">Travel</option>
             <option value="class">Class</option>
+            <option value="studyhall">Study hall</option>
             <option value="club">Club</option>
             <option value="interview">Interview</option>
             <option value="other">Other</option>
@@ -550,6 +707,48 @@ footer.foot{
     <div id="diningDirectory"></div>
   </section>
 
+  <!-- ============ RECAP TAB ============ -->
+  <section class="tab" id="tab-recap">
+    <h2 class="section-title">Week recap</h2>
+    <p class="section-sub">Your week repeats, so this is last week and next week as planned. Picks come from the day panel on Schedule and from Fuel.</p>
+    <div class="recap-stats" id="recapStats"></div>
+    <h3 class="recap-heading">NCAA hours</h3>
+    <div id="recapHours"></div>
+    <h3 class="recap-heading">Follow-through</h3>
+    <div id="recapFollow"></div>
+    <h3 class="recap-heading">Suggestions</h3>
+    <ul class="recap-tips" id="recapTips"></ul>
+    <h3 class="recap-heading">Day by day</h3>
+    <div class="grid-scroll"><table class="recap-table" id="recapTable"></table></div>
+  </section>
+
+  <!-- ============ HOW IT WORKS TAB ============ -->
+  <section class="tab" id="tab-info">
+    <h2 class="section-title">How it works</h2>
+    <p class="section-sub">How the Fuel tab sets your meal goals and picks foods. Ballpark only.</p>
+
+    <div class="info-section">
+      <h3>1. Your goal for each meal</h3>
+      <p id="info-example-intro"></p>
+      <ol id="info-steps"></ol>
+      <p id="info-why"></p>
+    </div>
+
+    <div class="info-section">
+      <h3>2. What kind of gap it is</h3>
+      <p>Free time of 20+ minutes gets a label:</p>
+      <ul id="info-gap-types"></ul>
+    </div>
+
+    <div class="info-section">
+      <h3>3. How the 3 foods are picked</h3>
+      <p>Each food gets a score for how far it is from your meal goal:</p>
+      <code class="info-formula">score = |food protein − goal protein| ÷ goal protein + |food carbs − goal carbs| ÷ goal carbs</code>
+      <p>The 3 lowest scores are shown. Dividing by the goal makes protein and carbs count equally. Foods that change when your goal changes are marked <b>New</b>.</p>
+      <p><b>Not counted:</b> fat, calories, sex, body type, goals like cutting, and allergies. Every meal gets the same goal, and menus are samples.</p>
+    </div>
+  </section>
+
 </div>
 
 <footer class="foot">Illini Playbook · Not affiliated with University Housing · Menu figures are illustrative.</footer>
@@ -566,7 +765,13 @@ var DAY_FULL = {Mon:"Monday",Tue:"Tuesday",Wed:"Wednesday",Thu:"Thursday",Fri:"F
 
 var TYPE_META = {
   practice:{label:"Practice", cls:"type-practice"},
+  lift:{label:"Lift", cls:"type-lift"},
+  game:{label:"Game / meet", cls:"type-game"},
+  film:{label:"Film", cls:"type-film"},
+  treatment:{label:"Treatment", cls:"type-treatment"},
+  travel:{label:"Travel", cls:"type-travel"},
   class:{label:"Class", cls:"type-class"},
+  studyhall:{label:"Study hall", cls:"type-studyhall"},
   club:{label:"Club", cls:"type-club"},
   interview:{label:"Interview", cls:"type-interview"},
   other:{label:"Other", cls:"type-other"}
@@ -631,6 +836,11 @@ var IS_TEST_COPY = document.documentElement.getAttribute("data-copy") === "test"
 var STORAGE_PREFIX = IS_TEST_COPY ? "test-" : "";
 var STORAGE_KEY = STORAGE_PREFIX + "illini-playbook-commitments-v1";
 var PROFILE_KEY = STORAGE_PREFIX + "illini-playbook-profile-v1";
+var PICKS_KEY = STORAGE_PREFIX + "illini-playbook-meal-picks-v1";
+var ACTIVITY_PICKS_KEY = STORAGE_PREFIX + "illini-playbook-activity-picks-v1";
+var ACTIVITY_DONE_KEY = STORAGE_PREFIX + "illini-playbook-activity-done-v1";
+var CUSTOM_IDEAS_KEY = STORAGE_PREFIX + "illini-playbook-custom-ideas-v1";
+var SEASON_KEY = STORAGE_PREFIX + "illini-playbook-season-v1";
 if (IS_TEST_COPY) {
   var testBanner = document.createElement("p");
   testBanner.className = "test-copy-banner";
@@ -642,6 +852,18 @@ var MIN_WEIGHT_LB = 50, MAX_WEIGHT_LB = 500;
 var MEALS_PER_DAY = 4;
 var LOAD_LABELS = {rest:"rest day", moderate:"moderate training", hard:"hard training"};
 
+// Nutrition targets per kg of body weight. The How it works tab explains these from the same values.
+var LB_PER_KG = 2.2046;
+var PROTEIN_G_PER_KG = [1.6, 2.2];
+var CARBS_G_PER_KG = {rest:[3,4], moderate:[4,6], hard:[6,8]};
+var CALORIES_PER_KG = {rest:[26,30], moderate:[30,36], hard:[34,42]};
+var EXAMPLE_WEIGHT_LB = 150;
+
+// How close to practice a gap must be to count as pre-practice or recovery.
+var PRE_PRACTICE_WINDOW_MIN = 120;
+var RECOVERY_WINDOW_MIN = 90;
+var BREAKFAST_ENDS_MIN = 10*60+30, LUNCH_ENDS_MIN = 14*60+30, DINNER_STARTS_MIN = 16*60+30;
+
 /* ============================================================
    STATE
 ============================================================ */
@@ -650,7 +872,15 @@ var state = {
   editingId: null,
   fuelDay: "Mon",
   profile: {weight:null, load:"hard"},
-  previousProfile: null
+  previousProfile: null,
+  mealPicks: {},      // gap key ("Mon|300-360") -> picked food name
+  expandedGaps: {},   // gap key -> true while "Show all options" is on
+  selectedDay: null,  // day whose details are open on the Schedule tab, or null
+  activityPicks: {},  // gap key -> picked idea name (separate from the meal pick)
+  activityDone: {},   // done key (date + gap key + idea) -> true
+  customIdeas: {},    // gap key -> {name, minutes, group} the user typed in for that gap
+  customFormGap: null, // gap key whose "Something else" form is open, or null
+  season: "in"         // "in" or "out" of season, for the NCAA hour limit
 };
 
 function loadCommitments(){
@@ -663,11 +893,15 @@ function loadCommitments(){
   }catch(e){ /* storage unavailable or empty — fall through to seed */ }
   // seed with a light example so the board isn't empty on first visit
   state.commitments = [
-    {id:"seed1", title:"Morning lift", type:"practice", days:["Mon","Wed","Fri"], start:"06:00", end:"07:15", loc:"Ubben Basketball Complex", notes:""},
+    {id:"seed1", title:"Morning lift", type:"lift", days:["Mon","Wed","Fri"], start:"06:00", end:"07:15", loc:"Ubben Basketball Complex", notes:""},
     {id:"seed2", title:"KIN 250 lecture", type:"class", days:["Mon","Wed","Fri"], start:"09:00", end:"09:50", loc:"Freer Hall", notes:""},
     {id:"seed3", title:"Team practice", type:"practice", days:["Mon","Tue","Wed","Thu","Fri"], start:"14:30", end:"17:00", loc:"State Farm Center", notes:""},
     {id:"seed4", title:"SAAC meeting", type:"club", days:["Tue"], start:"18:00", end:"19:00", loc:"Bielfeldt Athletic Administration Bldg", notes:""},
-    {id:"seed5", title:"ENG 100 discussion", type:"class", days:["Tue","Thu"], start:"11:00", end:"12:15", loc:"Grainger Library", notes:""}
+    {id:"seed5", title:"ENG 100 discussion", type:"class", days:["Tue","Thu"], start:"11:00", end:"12:15", loc:"Grainger Library", notes:""},
+    {id:"seed6", title:"Team film session", type:"film", days:["Sat"], start:"10:00", end:"11:00", loc:"State Farm Center", notes:""},
+    {id:"seed7", title:"Game", type:"game", days:["Sat"], start:"13:00", end:"16:00", loc:"State Farm Center", notes:""},
+    {id:"seed8", title:"Treatment", type:"treatment", days:["Sun"], start:"10:00", end:"11:00", loc:"Ubben Basketball Complex", notes:""},
+    {id:"seed9", title:"Study hall", type:"studyhall", days:["Sun"], start:"14:00", end:"16:00", loc:"Grainger Library", notes:""}
   ];
 }
 function saveCommitments(){
@@ -701,12 +935,23 @@ function fmtTime(hhmm){
 /* ============================================================
    TABS
 ============================================================ */
+// data-view names the open tab so CSS can give a tab its own colors (dimmer Schedule, dark How it works).
+function showTab(tab){
+  document.querySelectorAll("nav.tabs button").forEach(function(b){b.classList.toggle("active", b.dataset.tab===tab);});
+  document.querySelectorAll("section.tab").forEach(function(s){s.classList.toggle("active", s.id==="tab-"+tab);});
+  var root = document.documentElement;
+  root.setAttribute("data-view", tab);
+  // How it works always uses the app's dark scheme; the other tabs always use the dimmer gray one.
+  root.setAttribute("data-theme", tab==="info" ? "dark" : "light");
+  if(tab==="schedule") renderSchedule();   // picks the meal shown in the day panel up from Fuel
+  if(tab==="fuel") renderFuel();
+  if(tab==="info") renderInfo();
+  if(tab==="recap") renderRecap();
+}
+
 document.getElementById("tabs").addEventListener("click", function(e){
   var btn = e.target.closest("button[data-tab]");
-  if(!btn) return;
-  document.querySelectorAll("nav.tabs button").forEach(function(b){b.classList.toggle("active", b===btn);});
-  document.querySelectorAll("section.tab").forEach(function(s){s.classList.toggle("active", s.id==="tab-"+btn.dataset.tab);});
-  if(btn.dataset.tab==="fuel") renderFuel();
+  if(btn) showTab(btn.dataset.tab);
 });
 
 /* ============================================================
@@ -775,15 +1020,451 @@ function renderSnapshot(byDay){
   });
   var max = Math.max.apply(null, totals.concat([1]));
   var busiestIdx = totals.indexOf(max);
+  var today = todayName();
   el.innerHTML = DAYS.map(function(d,i){
     var h = totals[i]/60;
     var barH = Math.max(4, (totals[i]/max)*56);
-    return '<div class="snap-day'+(i===busiestIdx && max>0 ? ' busiest':'')+'">'+
+    var track = totals[i]===0
+      ? '<span class="free-label">Free day</span>'
+      : '<div class="bar" style="height:'+barH.toFixed(0)+'px"></div>';
+    var tags = (d===today ? '<span class="today-tag">Today</span>' : '')+
+      (i===busiestIdx && max>0 ? '<span class="busy-tag">Busiest</span>' : '');
+    var classes = "snap-day"+(i===busiestIdx && max>0 ? " busiest":"")+(state.selectedDay===d ? " selected":"");
+    return '<button type="button" class="'+classes+'" data-day="'+d+'" aria-expanded="'+(state.selectedDay===d)+'" aria-controls="dayDetail">'+
+      (tags ? '<span class="tile-tags">'+tags+'</span>' : '')+
       '<div class="d">'+d+'</div>'+
-      '<div class="bar-track"><div class="bar" style="height:'+barH.toFixed(0)+'px"></div></div>'+
+      '<div class="bar-track">'+track+'</div>'+
       '<div class="hrs">'+h.toFixed(1)+'h</div>'+
-      '</div>';
+      '</button>';
   }).join("");
+}
+
+// Today's short day name ("Mon"…"Sun"); getDay() counts from Sunday.
+function todayName(){ return DAYS[(new Date().getDay()+6)%7]; }
+
+/* Gap ideas for a student athlete. Minutes is how long each takes; a gap only offers ideas that fit.
+   Each gap offers one idea from each group. "after" ideas only show right after training (a recovery
+   window) and come first there; "notAfter" ideas never show right after training. */
+var ACTIVITY_IDEAS = [
+  {name:"Hydrate and snack", minutes:10, group:"recover"},
+  {name:"Foam roll and stretch", minutes:15, group:"recover"},
+  {name:"Ice bath / treatment", minutes:20, group:"recover", when:"after"},
+  {name:"Mobility session", minutes:30, group:"recover"},
+  {name:"Email a professor about travel", minutes:15, group:"study"},
+  {name:"Review flashcards", minutes:20, group:"study"},
+  {name:"Review game film", minutes:30, group:"study"},
+  {name:"Update your r\u00e9sum\u00e9", minutes:45, group:"study"},
+  {name:"Study hall hours", minutes:60, group:"study"},
+  {name:"Career fair prep", minutes:90, group:"study"},
+  {name:"Quiet time, phone away", minutes:15, group:"rest"},
+  {name:"20-min nap (set a timer)", minutes:20, group:"rest", when:"notAfter"},
+  {name:"Music or podcast break", minutes:20, group:"rest"}
+];
+var IDEA_GROUPS = ["recover", "study", "rest"];
+var IDEA_GROUP_NAMES = {recover:"Recover", study:"Study", rest:"Rest"};
+
+// For each group, the best idea that fits the gap: after training, recovery-only ideas first; otherwise the longest.
+function ideasFor(gapMinutes, gapKind){
+  var afterTraining = gapKind==="rec";
+  return IDEA_GROUPS.map(function(group){
+    return ACTIVITY_IDEAS.filter(function(idea){
+      if(idea.group!==group || idea.minutes > gapMinutes) return false;
+      if(idea.when==="after") return afterTraining;
+      if(idea.when==="notAfter") return !afterTraining;
+      return true;
+    }).sort(function(a,b){ return (b.when==="after")-(a.when==="after") || b.minutes-a.minutes; })[0];
+  }).filter(Boolean);
+}
+
+function lengthText(mins){
+  var hours = Math.floor(mins/60), rest = mins%60;
+  return (hours ? hours+'h' : '')+(hours && rest ? ' ' : '')+(rest ? rest+'m' : '');
+}
+
+function loadActivityPicks(){ state.activityPicks = loadPickMap(ACTIVITY_PICKS_KEY); }
+
+// Done is saved for this week's date, so a weekly gap starts fresh next week, and with the idea's
+// name, so switching to a different idea doesn't carry the old one's done over.
+function doneKey(day, key, idea){ return dateOfThisWeek(day)+"|"+key+"|"+idea; }
+
+// The given weekday's date in the current Monday-to-Sunday week, or weeksBack weeks before it.
+function weekdayDate(day, weeksBack){
+  var date = new Date();
+  date.setDate(date.getDate() - (date.getDay()+6)%7 + DAYS.indexOf(day) - 7*(weeksBack||0));
+  return date;
+}
+
+// The same date as text ("2026-11-12"), used in done keys.
+function dateOfThisWeek(day, weeksBack){
+  var date = weekdayDate(day, weeksBack);
+  var pad = function(n){ return (n<10?"0":"")+n; };
+  return date.getFullYear()+"-"+pad(date.getMonth()+1)+"-"+pad(date.getDate());
+}
+
+function loadActivityDone(){ state.activityDone = loadPickMap(ACTIVITY_DONE_KEY); }
+
+/* "Something else…": the user's own activity for one gap, with its length and Recap group. */
+var CUSTOM_OPTION = "__custom";
+var MIN_CUSTOM_MINUTES = 5;
+var MAX_CUSTOM_NAME = 60;
+
+/* NCAA countable hours (Division I, as Nidhi and Claude understood the rule; a compliance office has
+   the final word): practice, lift and film count for their length, a game counts as 3 hours however
+   long it runs, and treatment, travel, study hall and class don't count. */
+var COUNTABLE_TYPES = ["practice", "lift", "film"];
+var GAME_COUNTED_MIN = 3*60;
+var WEEKLY_LIMIT_MIN = {in:20*60, out:8*60};
+var NEAR_LIMIT_SHARE = 0.9;
+
+function countableMinutes(event){
+  if(event.ref.type==="game") return GAME_COUNTED_MIN;
+  return COUNTABLE_TYPES.indexOf(event.ref.type)>=0 ? event.endMin-event.startMin : 0;
+}
+
+function countableWeek(){
+  var byDay = expandByDay();
+  var days = DAYS.map(function(d){
+    return {day:d, minutes: byDay[d].reduce(function(sum, e){ return sum+countableMinutes(e); }, 0)};
+  });
+  var total = days.reduce(function(sum, d){ return sum+d.minutes; }, 0);
+  var limit = WEEKLY_LIMIT_MIN[state.season];
+  return {days:days, total:total, limit:limit, over: total>limit, near: total>=limit*NEAR_LIMIT_SHARE && total<=limit,
+    daysOff: days.filter(function(d){ return d.minutes===0; }).map(function(d){ return d.day; })};
+}
+
+function loadSeason(){
+  try{ if(localStorage.getItem(SEASON_KEY)==="out") state.season = "out"; }
+  catch(e){ /* storage unavailable \u2014 stay in season */ }
+}
+
+function setSeason(season){
+  state.season = season;
+  try{ localStorage.setItem(SEASON_KEY, season); }
+  catch(e){ /* storage unavailable \u2014 season still holds for this session */ }
+  renderRecap();
+}
+
+function renderHourLimit(week){
+  var status = week.over ? "over" : week.near ? "near" : "ok";
+  var statusText = week.over ? "Over the limit by "+lengthText(week.total-week.limit)
+    : week.near ? "Close to the limit: "+lengthText(week.limit-week.total)+" left"
+    : lengthText(week.limit-week.total)+" left this week";
+  var fill = Math.min(100, Math.round(week.total/week.limit*100));
+  document.getElementById("recapHours").innerHTML =
+    '<div class="season-switch" role="group" aria-label="Season">'+
+      ['in','out'].map(function(season){
+        return '<button type="button" class="pick-btn'+(state.season===season?' is-picked':'')+'" data-season="'+season+'" aria-pressed="'+(state.season===season)+'">'+
+          (season==="in" ? "In season \u00b7 20h" : "Out of season \u00b7 8h")+'</button>';
+      }).join("")+
+    '</div>'+
+    '<div class="hours-total"><span class="hours-value">'+hoursText(week.total)+'</span> of '+(week.limit/60)+'h countable</div>'+
+    '<div class="hours-bar '+status+'" role="img" aria-label="'+escapeAttr(statusText)+'"><div style="width:'+fill+'%"></div></div>'+
+    '<p class="hours-status '+status+'">'+statusText+'</p>'+
+    '<p class="hours-status '+(week.daysOff.length ? 'ok' : 'over')+'">'+
+      (week.daysOff.length ? 'Day off: '+week.daysOff.map(function(d){ return DAY_FULL[d]; }).join(", ")
+        : 'No day off: every day has countable hours')+'</p>'+
+    '<p class="recap-note">Counts practice, lift and film; a game counts as 3h. Treatment, travel, study hall and class don\u2019t count. Your compliance office has the final word.</p>';
+}
+
+function loadCustomIdeas(){
+  var saved = loadPickMap(CUSTOM_IDEAS_KEY);
+  state.customIdeas = {};
+  Object.keys(saved).forEach(function(key){
+    var c = saved[key];
+    if(c && typeof c.name==="string" && c.name && c.minutes>0 && IDEA_GROUPS.indexOf(c.group)>=0) state.customIdeas[key] = c;
+  });
+}
+
+// The idea picked for a gap, from the starter list or the user's own; null if none.
+function pickedIdeaFor(key){
+  var name = state.activityPicks[key];
+  if(!name) return null;
+  var custom = state.customIdeas[key];
+  if(custom && custom.name===name) return custom;
+  return ACTIVITY_IDEAS.find(function(i){ return i.name===name; }) || null;
+}
+
+function openCustomForm(key){
+  state.customFormGap = key;
+  renderSchedule();
+  var name = document.querySelector('#dayDetail [data-custom-name]');
+  if(name) name.focus();
+}
+
+function saveCustomIdea(form){
+  var key = form.dataset.customGap;
+  var gapMinutes = +form.dataset.gapMinutes;
+  var name = form.querySelector("[data-custom-name]").value.trim().slice(0, MAX_CUSTOM_NAME);
+  var minutes = Number(form.querySelector("[data-custom-minutes]").value);
+  var groupInput = form.querySelector("[data-custom-group]:checked");
+  var error = form.querySelector(".custom-error");
+  if(!name){ error.textContent = "Add what you'll do."; return; }
+  if(!Number.isInteger(minutes) || minutes < MIN_CUSTOM_MINUTES){ error.textContent = "Enter how many minutes (at least "+MIN_CUSTOM_MINUTES+")."; return; }
+  if(minutes > gapMinutes){ error.textContent = "This gap is only "+lengthText(gapMinutes)+". Enter "+gapMinutes+" minutes or less."; return; }
+  state.customIdeas[key] = {name:name, minutes:minutes, group: groupInput ? groupInput.value : "study"};
+  savePickMap(CUSTOM_IDEAS_KEY, state.customIdeas);
+  state.customFormGap = null;
+  setActivityPick(key, name);
+}
+
+function customForm(key, gapMinutes){
+  var current = state.customIdeas[key] || {name:"", minutes:"", group:"study"};
+  return '<div class="custom-form" data-custom-gap="'+escapeAttr(key)+'" data-gap-minutes="'+gapMinutes+'">'+
+    '<label>What will you do?<input type="text" data-custom-name maxlength="'+MAX_CUSTOM_NAME+'" value="'+escapeAttr(current.name)+'" placeholder="CS 124 MP, call home"></label>'+
+    '<label>How long?<span class="custom-minutes"><input type="number" data-custom-minutes inputmode="numeric" min="'+MIN_CUSTOM_MINUTES+'" max="'+gapMinutes+'" step="1" value="'+current.minutes+'"> min</span></label>'+
+    '<fieldset><legend>Counts as</legend>'+IDEA_GROUPS.map(function(group){
+      return '<label class="custom-group"><input type="radio" name="custom-group" data-custom-group value="'+group+'"'+(current.group===group?' checked':'')+'> '+IDEA_GROUP_NAMES[group]+'</label>';
+    }).join("")+'</fieldset>'+
+    '<p class="custom-error" role="alert"></p>'+
+    '<div class="custom-actions"><button type="button" class="btn" data-custom-save>Save</button>'+
+    '<button type="button" class="btn secondary" data-custom-cancel>Cancel</button></div>'+
+    '</div>';
+}
+
+function toggleActivityDone(key){
+  var day = key.split("|")[0];
+  var done = doneKey(day, key, state.activityPicks[key]);
+  if(state.activityDone[done]) delete state.activityDone[done];
+  else state.activityDone[done] = true;
+  savePickMap(ACTIVITY_DONE_KEY, state.activityDone);
+  renderSchedule();
+}
+
+// An empty idea (the "Pick something to do…" line) clears the gap's pick.
+function setActivityPick(key, idea){
+  if(idea) state.activityPicks[key] = idea;
+  else delete state.activityPicks[key];
+  savePickMap(ACTIVITY_PICKS_KEY, state.activityPicks);
+  renderSchedule();
+}
+
+/* ============================================================
+   WEEK RECAP
+============================================================ */
+// Adds up the planned week: busy and free time, which gaps have a meal or idea picked,
+// and how much picked time goes to recovery, study and rest. Picks for gaps that no longer exist are ignored.
+function weekSummary(){
+  var byDay = expandByDay();
+  var groupMinutes = {recover:0, study:0, rest:0};
+  var days = DAYS.map(function(d){
+    var events = byDay[d];
+    var gaps = findGaps(events);
+    var day = {day:d, busyMin:0, freeMin:0, gaps:gaps.length, planned:0, recover:0, longestOpen:null};
+    events.forEach(function(e){ day.busyMin += e.endMin-e.startMin; });
+    gaps.forEach(function(g){
+      var key = gapKey(d, g);
+      var ideaName = state.activityPicks[key];
+      var idea = pickedIdeaFor(key);
+      day.freeMin += g.end-g.start;
+      if(idea){ groupMinutes[idea.group] += idea.minutes; if(idea.group==="recover") day.recover++; }
+      if(ideaName || state.mealPicks[key]) day.planned++;
+      else if(!day.longestOpen || g.end-g.start > day.longestOpen.end-day.longestOpen.start) day.longestOpen = g;
+    });
+    return day;
+  });
+  var total = function(field){ return days.reduce(function(sum, day){ return sum+day[field]; }, 0); };
+  return {days:days, groupMinutes:groupMinutes, gaps:total("gaps"), planned:total("planned"),
+    busyMin:total("busyMin"), freeMin:total("freeMin")};
+}
+
+/* Follow-through: how many picked ideas were marked done in a week. The plan repeats, so a week's
+   plans are today's picks; this week only counts days up to today. */
+var FOLLOW_GROUP_WORDS = {recover:"Recovery", study:"Study", rest:"Rest"};
+
+function followThrough(weeksBack){
+  var byDay = expandByDay();
+  var lastDayIdx = weeksBack===0 ? (new Date().getDay()+6)%7 : DAYS.length-1;
+  var doneKeys = Object.keys(state.activityDone);
+  var weekDates = DAYS.map(function(d){ return dateOfThisWeek(d, weeksBack); });
+  var result = {planned:0, done:0, groups:{}, missedDays:{},
+    hasCheckins: doneKeys.some(function(k){ return weekDates.indexOf(k.split("|")[0])>=0; })};
+  IDEA_GROUPS.forEach(function(group){ result.groups[group] = {planned:0, done:0}; result.missedDays[group] = {}; });
+  DAYS.slice(0, lastDayIdx+1).forEach(function(d){
+    findGaps(byDay[d]).forEach(function(g){
+      var key = gapKey(d, g);
+      var idea = pickedIdeaFor(key);
+      if(!idea) return;
+      var prefix = dateOfThisWeek(d, weeksBack)+"|"+key+"|";
+      var done = doneKeys.some(function(k){ return k.indexOf(prefix)===0; });
+      result.planned++; result.groups[idea.group].planned++;
+      if(done){ result.done++; result.groups[idea.group].done++; }
+      else result.missedDays[idea.group][d] = (result.missedDays[idea.group][d]||0)+1;
+    });
+  });
+  return result;
+}
+
+// "Nov 2–8", or "Oct 26–Nov 1" across a month change.
+function weekLabel(weeksBack){
+  var start = weekdayDate("Mon", weeksBack), end = weekdayDate("Sun", weeksBack);
+  var month = function(d){ return d.toLocaleDateString("en-US", {month:"short"}); };
+  return month(start)+" "+start.getDate()+"\u2013"+(month(end)!==month(start) ? month(end)+" " : "")+end.getDate();
+}
+
+// Tips from last week's check-ins: the group done least, and the day it was missed most.
+function followThroughTips(last){
+  if(!last.hasCheckins || last.planned===0) return [];
+  if(last.done===last.planned) return [{day:null, good:true, text:"You did all "+last.planned+" plans last week"}];
+  var worst = IDEA_GROUPS.filter(function(g){ return last.groups[g].planned > last.groups[g].done; })
+    .sort(function(a,b){ return last.groups[a].done/last.groups[a].planned - last.groups[b].done/last.groups[b].planned; })[0];
+  var misses = last.missedDays[worst];
+  var day = Object.keys(misses).sort(function(a,b){ return misses[b]-misses[a]; })[0];
+  return [{day:day, text:FOLLOW_GROUP_WORDS[worst]+" done "+last.groups[worst].done+" of "+last.groups[worst].planned+
+    " last week; most missed on "+DAY_FULL[day]}];
+}
+
+function renderFollowThrough(last, now){
+  var cell = function(week, part){
+    var counts = part ? week.groups[part] : week;
+    return counts.planned ? counts.done+" of "+counts.planned : "\u2014";
+  };
+  var rows = [{label:"Plans done", part:null}].concat(IDEA_GROUPS.map(function(g){ return {label:IDEA_GROUP_NAMES[g], part:g}; }));
+  document.getElementById("recapFollow").innerHTML =
+    '<div class="grid-scroll"><table class="recap-table"><thead><tr><th></th>'+
+      '<th>Last week<small>'+weekLabel(1)+'</small></th><th>This week so far<small>'+weekLabel(0)+'</small></th></tr></thead><tbody>'+
+    rows.map(function(r){
+      return '<tr><td><b>'+r.label+'</b></td><td>'+(last.hasCheckins ? cell(last, r.part) : "\u2014")+'</td><td>'+cell(now, r.part)+'</td></tr>';
+    }).join("")+'</tbody></table></div>'+
+    (last.hasCheckins ? '' : '<p class="recap-note">Last week has no check-ins yet. Tap <b>Mark done</b> in a day\u2019s panel, and next Monday this fills in.</p>');
+}
+
+function hoursText(mins){ return mins ? lengthText(mins) : "0h"; }
+
+// Turns the summary into a few concrete next steps, each tied to the day it's about.
+function hourLimitTips(week){
+  var tips = [];
+  var heaviest = week.days.slice().sort(function(a,b){ return b.minutes-a.minutes; })[0];
+  if(week.over) tips.push({day:heaviest.day, text:"Over the "+(week.limit/60)+"-hour limit by "+lengthText(week.total-week.limit)+"; "+DAY_FULL[heaviest.day]+" has the most ("+hoursText(heaviest.minutes)+")"});
+  if(week.daysOff.length===0) tips.push({day:null, text:"No day off this week; NCAA rules require one in season"});
+  return tips;
+}
+
+function recapSuggestions(summary, last, week){
+  var tips = hourLimitTips(week).concat(followThroughTips(last));
+  var byBusy = summary.days.slice().sort(function(a,b){ return b.busyMin-a.busyMin; });
+  var byOpen = summary.days.filter(function(d){ return d.longestOpen; })
+    .sort(function(a,b){ return (b.gaps-b.planned)-(a.gaps-a.planned) || b.freeMin-a.freeMin; });
+  var busiest = byBusy[0];
+
+  if(byOpen.length){
+    var most = byOpen[0];
+    tips.push({day:most.day, text:(summary.gaps-summary.planned)+" gap"+(summary.gaps-summary.planned===1?"":"s")+
+      " open; most on "+DAY_FULL[most.day]+" ("+(most.gaps-most.planned)+")"});
+  }
+  if(busiest.busyMin>0 && busiest.recover===0 && busiest.gaps>0){
+    tips.push({day:busiest.day, text:"No recovery on "+DAY_FULL[busiest.day]+", your busiest day"});
+  }
+  if(summary.groupMinutes.rest===0 && byOpen.length){
+    tips.push({day:byOpen[0].day, text:"No rest yet; try a 20-min nap before practice"});
+  }
+  if(summary.groupMinutes.study===0){
+    var roomiest = summary.days.filter(function(d){ return d.longestOpen; })
+      .sort(function(a,b){ return (b.longestOpen.end-b.longestOpen.start)-(a.longestOpen.end-a.longestOpen.start); })[0];
+    if(roomiest){
+      var g = roomiest.longestOpen;
+      tips.push({day:roomiest.day, text:"No study time; longest gap is "+roomiest.day+" "+
+        minToClock(g.start)+"\u2013"+minToClock(g.end)});
+    }
+  }
+  if(tips.length===0){
+    tips.push({day:null, good:true, text:"Every gap planned, with recovery, study and rest"});
+  }
+  return tips.slice(0, 4);
+}
+
+function renderRecap(){
+  var summary = weekSummary();
+  var gm = summary.groupMinutes;
+  document.getElementById("recapStats").innerHTML =
+    '<div class="recap-stat"><div class="label">Gaps planned</div><div class="value">'+summary.planned+' of '+summary.gaps+'</div>'+
+      '<div class="detail">'+(summary.gaps-summary.planned)+' still open</div></div>'+
+    '<div class="recap-stat"><div class="label">Recover \u00b7 Study \u00b7 Rest</div><div class="value">'+
+      hoursText(gm.recover)+' \u00b7 '+hoursText(gm.study)+' \u00b7 '+hoursText(gm.rest)+'</div>'+
+      '<div class="detail">from ideas you picked</div></div>'+
+    '<div class="recap-stat"><div class="label">Busy vs free</div><div class="value">'+Math.round(summary.busyMin/60)+'h \u00b7 '+Math.round(summary.freeMin/60)+'h</div>'+
+      '<div class="detail">free time counted 5 AM\u201311 PM</div></div>';
+
+  var week = countableWeek();
+  renderHourLimit(week);
+  var last = followThrough(1);
+  renderFollowThrough(last, followThrough(0));
+  document.getElementById("recapTips").innerHTML = recapSuggestions(summary, last, week).map(function(tip){
+    return '<li'+(tip.good?' class="good"':'')+'><span>'+escapeHtml(tip.text)+'</span>'+
+      (tip.day ? '<button type="button" class="pick-btn" data-plan-day="'+tip.day+'">Plan '+tip.day+' \u2192</button>' : '')+'</li>';
+  }).join("");
+
+  document.getElementById("recapTable").innerHTML =
+    '<thead><tr><th>Day</th><th>Busy</th><th>NCAA</th><th>Free</th><th>Gaps planned</th></tr></thead><tbody>'+
+    summary.days.map(function(d, i){
+      return '<tr><td><b>'+d.day+'</b></td><td>'+hoursText(d.busyMin)+'</td><td>'+hoursText(week.days[i].minutes)+'</td><td>'+hoursText(d.freeMin)+'</td><td>'+d.planned+' of '+d.gaps+'</td></tr>';
+    }).join("")+'</tbody>';
+}
+
+// "Plan Tue" on a suggestion: open Schedule with that day's panel showing.
+function planDay(day){
+  state.selectedDay = day;
+  showTab("schedule");
+  document.getElementById("dayDetail").scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+// Lists the open day's commitments and the free gaps between them, in time order.
+function renderDayDetail(byDay){
+  var el = document.getElementById("dayDetail");
+  var day = state.selectedDay;
+  if(!day){ el.innerHTML = ""; return; }
+  var events = byDay[day];
+  var rows = events.map(function(e){
+    var meta = TYPE_META[e.ref.type] || TYPE_META.other;
+    return {start:e.startMin, html:'<div class="day-detail-row">'+
+      '<div class="time">'+minToClock(e.startMin)+'\u2013'+minToClock(e.endMin)+'</div>'+
+      '<div class="swatch '+meta.cls+'"></div>'+
+      '<div class="what"><b>'+escapeHtml(e.ref.title)+'</b><small>'+meta.label+(e.ref.loc?' \u00b7 '+escapeHtml(e.ref.loc):'')+'</small></div>'+
+      '</div>'};
+  }).concat(findGaps(events).map(function(g){
+    var key = gapKey(day, g);
+    var picked = state.activityPicks[key];
+    var ideas = ideasFor(g.end-g.start, classifyGap(g, events).kind);
+    var custom = state.customIdeas[key];
+    if(custom && !ideas.some(function(i){ return i.name===custom.name; })) ideas.push(custom);
+    // Keep a saved pick visible even if it isn't among the ideas shown now.
+    if(picked && !ideas.some(function(i){ return i.name===picked; })) ideas.push({name:picked});
+    var formOpen = state.customFormGap===key;
+    var meal = state.mealPicks[key];
+    return {start:g.start, html:'<div class="day-detail-row free">'+
+      '<div class="time">'+minToClock(g.start)+'\u2013'+minToClock(g.end)+'</div>'+
+      '<div class="swatch"></div>'+
+      '<div class="what">Free \u00b7 '+lengthText(g.end-g.start)+' <small>'+classifyGap(g, events).label+' window</small>'+
+        (meal ? '<div class="gap-meal">Meal: '+escapeHtml(meal)+'</div>' : '')+
+        '<select class="idea-select'+(picked?' is-picked':'')+'" data-idea-gap="'+escapeAttr(key)+'" aria-label="Something to do '+minToClock(g.start)+' to '+minToClock(g.end)+'">'+
+          '<option value="">Pick something to do\u2026</option>'+
+          ideas.map(function(idea){
+            return '<option value="'+escapeAttr(idea.name)+'"'+(idea.name===picked && !formOpen?' selected':'')+'>'+
+              escapeHtml(idea.name)+(idea.minutes?' \u00b7 '+lengthText(idea.minutes):'')+'</option>';
+          }).join("")+
+          '<option value="'+CUSTOM_OPTION+'"'+(formOpen?' selected':'')+'>Something else\u2026</option>'+
+        '</select>'+
+        (formOpen ? customForm(key, g.end-g.start) : '')+
+        (picked && !formOpen ? doneButton(key, state.activityDone[doneKey(day, key, picked)]) : '')+
+      '</div>'+
+      '</div>'};
+  })).sort(function(a,b){ return a.start-b.start; });
+  var body = events.length===0
+    ? '<p class="empty-note">Free day \u2014 nothing scheduled.</p>'
+    : rows.map(function(r){ return r.html; }).join("");
+  el.innerHTML = '<div class="day-detail" role="region" aria-label="'+DAY_FULL[day]+' details">'+
+    '<div class="day-detail-head"><h3>'+DAY_FULL[day]+'</h3>'+
+    '<button type="button" class="btn secondary" data-close-day>Close</button></div>'+
+    body+'</div>';
+}
+
+function doneButton(key, isDone){
+  return '<div class="done-row"><button type="button" class="done-btn'+(isDone?' is-done':'')+'" data-done-gap="'+escapeAttr(key)+'" aria-pressed="'+!!isDone+'">'+
+    (isDone ? '\u2713 Done' : 'Mark done')+'</button></div>';
+}
+
+function toggleDay(day){
+  state.selectedDay = state.selectedDay===day ? null : day;
+  renderSchedule();
 }
 
 function renderConflictBanner(byDay){
@@ -828,6 +1509,7 @@ function renderGrid(byDay){
       var top = (h*60-DAY_START)*PX_PER_MIN;
       html += '<div class="hour-line" style="top:'+top+'px"></div>';
     }
+    if(laidOut.length===0) html += '<div class="free-col-label">Free day</div>';
     laidOut.forEach(function(e){
       var top = (e.startMin-DAY_START)*PX_PER_MIN;
       var height = Math.max(18,(e.endMin-e.startMin)*PX_PER_MIN - 2);
@@ -855,6 +1537,7 @@ function escapeAttr(s){ return escapeHtml(s); }
 function renderSchedule(){
   var byDay = expandByDay();
   renderSnapshot(byDay);
+  renderDayDetail(byDay);
   renderConflictBanner(byDay);
   renderGrid(byDay);
 }
@@ -906,8 +1589,7 @@ document.getElementById("commitList").addEventListener("click", function(e){
     });
     document.getElementById("submitBtn").textContent = "Update commitment";
     document.getElementById("cancelEdit").style.display = "inline-block";
-    document.querySelectorAll('nav.tabs button').forEach(function(b){b.classList.toggle('active', b.dataset.tab==='add');});
-    document.querySelectorAll('section.tab').forEach(function(s){s.classList.toggle('active', s.id==='tab-add');});
+    showTab("add");
     window.scrollTo({top:0, behavior:"smooth"});
   }
 });
@@ -976,9 +1658,9 @@ document.getElementById("fuelDaySelector").addEventListener("click", function(e)
 });
 
 function mealPeriodFor(min){
-  if(min < 10*60+30) return "breakfast";
-  if(min < 14*60+30) return "lunch";
-  if(min >= 16*60+30) return "dinner";
+  if(min < BREAKFAST_ENDS_MIN) return "breakfast";
+  if(min < LUNCH_ENDS_MIN) return "lunch";
+  if(min >= DINNER_STARTS_MIN) return "dinner";
   return "lunch";
 }
 
@@ -996,16 +1678,20 @@ function findGaps(dayEvents){
   return gaps.filter(function(g){ return g.end-g.start >= 20; });
 }
 
+// Practices, lifts and games all set up pre-practice and recovery meal windows.
+var TRAINING_TYPES = ["practice", "lift", "game"];
+function isTraining(type){ return TRAINING_TYPES.indexOf(type) >= 0; }
+
 function classifyGap(gap, dayEvents){
-  var nextPractice = dayEvents.filter(function(e){ return e.ref.type==="practice" && e.startMin >= gap.end; })
+  var nextPractice = dayEvents.filter(function(e){ return isTraining(e.ref.type) && e.startMin >= gap.end; })
     .sort(function(a,b){return a.startMin-b.startMin;})[0];
-  var prevPractice = dayEvents.filter(function(e){ return e.ref.type==="practice" && e.endMin <= gap.start; })
+  var prevPractice = dayEvents.filter(function(e){ return isTraining(e.ref.type) && e.endMin <= gap.start; })
     .sort(function(a,b){return b.endMin-a.endMin;})[0];
 
-  if(nextPractice && nextPractice.startMin - gap.end <= 120){
+  if(nextPractice && nextPractice.startMin - gap.end <= PRE_PRACTICE_WINDOW_MIN){
     return {kind:"pre", label:"Pre-practice", tag:"pre-workout"};
   }
-  if(prevPractice && gap.start - prevPractice.endMin <= 90){
+  if(prevPractice && gap.start - prevPractice.endMin <= RECOVERY_WINDOW_MIN){
     return {kind:"rec", label:"Recovery", tag:"recovery"};
   }
   return {kind:"meal", label: capitalize(mealPeriodFor(gap.start)), tag:null};
@@ -1029,22 +1715,23 @@ function allDiningItems(){
 }
 
 function dailyTargets(lb, load){
-  var kg = lb/2.2046;
-  var carbPerKg = load==="hard" ? [6,8] : load==="moderate" ? [4,6] : [3,4];
-  var calPerKg = load==="hard" ? [34,42] : load==="moderate" ? [30,36] : [26,30];
+  var kg = lb/LB_PER_KG;
+  function perKg(range){ return [kg*range[0], kg*range[1]]; }
   return {
-    protein:[kg*1.6, kg*2.2],
-    carbs:[kg*carbPerKg[0], kg*carbPerKg[1]],
-    calories:[kg*calPerKg[0], kg*calPerKg[1]]
+    protein:perKg(PROTEIN_G_PER_KG),
+    carbs:perKg(CARBS_G_PER_KG[load]),
+    calories:perKg(CALORIES_PER_KG[load])
   };
 }
+
+function midpoint(range){ return (range[0]+range[1])/2; }
 
 function mealGoal(profile){
   if(!profile || profile.weight===null) return null;
   var daily = dailyTargets(profile.weight, profile.load);
   return {
-    protein:Math.round((daily.protein[0]+daily.protein[1])/2/MEALS_PER_DAY),
-    carbs:Math.round((daily.carbs[0]+daily.carbs[1])/2/MEALS_PER_DAY)
+    protein:Math.round(midpoint(daily.protein)/MEALS_PER_DAY),
+    carbs:Math.round(midpoint(daily.carbs)/MEALS_PER_DAY)
   };
 }
 
@@ -1052,7 +1739,14 @@ function goalDistance(item, goal){
   return Math.abs(item.protein-goal.protein)/goal.protein + Math.abs(item.carbs-goal.carbs)/goal.carbs;
 }
 
+var SUGGESTIONS_SHOWN = 3;
+
 function suggestFor(gap, classification, goal){
+  return rankedFoodsFor(gap, classification, goal).slice(0, SUGGESTIONS_SHOWN);
+}
+
+// Every food for this gap's meal, best match first (the top few are the suggestions).
+function rankedFoodsFor(gap, classification, goal){
   var meal = mealPeriodFor(gap.start);
   var pool = allDiningItems().filter(function(it){ return it.meal===meal; });
 
@@ -1066,7 +1760,7 @@ function suggestFor(gap, classification, goal){
   if(goal){
     pool.sort(function(a,b){ return goalDistance(a,goal) - goalDistance(b,goal); });
   }
-  return pool.slice(0,3);
+  return pool;
 }
 
 function profileLabel(profile){
@@ -1113,32 +1807,93 @@ function renderFuel(){
     return;
   }
 
+  // Keep open whichever gaps were open before re-rendering (e.g. after picking a food); otherwise open the first.
+  var openKeys = Array.prototype.map.call(el.querySelectorAll("details.gap-card[open]"), function(d){ return d.dataset.gap; });
+
+  var gapKeys = gaps.map(function(gap){ return gapKey(state.fuelDay, gap); });
+  var anyStillOpen = gapKeys.some(function(key){ return openKeys.indexOf(key)!==-1; });
+
   el.innerHTML = gaps.map(function(gap, idx){
+    var key = gapKeys[idx];
     var cls = classifyGap(gap, dayEvents);
-    var items = suggestFor(gap, cls, goal);
+    var ranked = rankedFoodsFor(gap, cls, goal);
+    var items = ranked.slice(0, SUGGESTIONS_SHOWN);
     var itemsBefore = goalBefore ? suggestFor(gap, cls, goalBefore) : items;
     var namesBefore = itemsBefore.map(function(it){ return it.name; });
     shownCount += items.length;
+
+    var pickedName = state.mealPicks[key] || null;
+    var expanded = !!state.expandedGaps[key];
+    var shown = expanded ? ranked : items.slice();
+    // A picked food stays visible even if it is no longer in the top suggestions.
+    var picked = ranked.filter(function(it){ return it.name===pickedName; })[0];
+    if(picked && shown.indexOf(picked)===-1) shown.push(picked);
+
     var labelCls = cls.kind==="pre" ? "pre-tag" : cls.kind==="rec" ? "rec-tag" : "";
     var goalHtml = goal ? '<p class="gap-goal">Aim for about '+goal.protein+' g protein and '+goal.carbs+' g carbs</p>' : '';
-    var foodHtml = items.length ? items.map(function(it){
-      var isNew = namesBefore.indexOf(it.name)===-1;
+    var foodHtml = shown.length ? shown.map(function(it){
+      var isTop = items.indexOf(it)!==-1;
+      var isNew = isTop && namesBefore.indexOf(it.name)===-1;
       if(isNew) changedCount++;
-      return '<div class="food-card">'+(isNew ? '<span class="new-pick">New</span>' : '')+'<p class="name">'+escapeHtml(it.name)+'</p>'+
+      var isPicked = it.name===pickedName;
+      return '<div class="food-card'+(isPicked?' picked':'')+'">'+(isNew ? '<span class="new-pick">New</span>' : '')+'<p class="name">'+escapeHtml(it.name)+'</p>'+
         '<p class="from">'+escapeHtml(it.hall)+' \u00b7 '+escapeHtml(it.station)+'</p>'+
         '<div class="macro-row"><span class="macro">'+it.cal+' cal</span><span class="macro">'+it.protein+'g pro</span><span class="macro">'+it.carbs+'g carb</span><span class="macro">'+it.fat+'g fat</span></div>'+
         '<div class="food-tags">'+it.tags.map(function(t){return '<span>'+t+'</span>';}).join("")+'</div>'+
+        '<button type="button" class="pick-btn'+(isPicked?' is-picked':'')+'" data-pick="'+escapeAttr(key)+'" data-food="'+escapeAttr(it.name)+'" aria-pressed="'+isPicked+'">'+
+          (isPicked ? 'Picked \u2713 (tap to undo)' : 'Pick this')+'</button>'+
         '</div>';
     }).join("") : '<p class="empty-note">No matches.</p>';
+    var moreHtml = ranked.length > SUGGESTIONS_SHOWN
+      ? '<div class="more-row"><button type="button" class="pick-btn" data-more="'+escapeAttr(key)+'">'+
+          (expanded ? 'Show top '+SUGGESTIONS_SHOWN+' only' : 'Show all options ('+ranked.length+')')+'</button></div>'
+      : '';
+    var pickedNote = pickedName ? '<span class="picked-note">Picked: '+escapeHtml(pickedName)+'</span>' : '';
+    var isOpen = anyStillOpen ? openKeys.indexOf(key)!==-1 : idx===0;
 
-    return '<details class="acc gap-card"'+(idx===0?' open':'')+'>'+
+    return '<details class="acc gap-card" data-gap="'+escapeAttr(key)+'"'+(isOpen?' open':'')+'>'+
       '<summary><span class="label tagpill '+labelCls+'" style="font-size:16px;padding:4px 10px;">'+cls.label+'</span>'+
-      '<span class="window">'+minToClock(gap.start)+' \u2013 '+minToClock(gap.end)+'</span><span class="chev">\u2304</span></summary>'+
-      '<div class="acc-body suggest-grid" style="padding-top:0;">'+goalHtml+foodHtml+'</div>'+
+      '<span class="window">'+minToClock(gap.start)+' \u2013 '+minToClock(gap.end)+'</span>'+pickedNote+'<span class="chev">\u2304</span></summary>'+
+      '<div class="acc-body suggest-grid" style="padding-top:0;">'+goalHtml+foodHtml+moreHtml+'</div>'+
       '</details>';
   }).join("");
   renderFuelChange(goal, changedCount, shownCount);
 }
+
+/* ============================================================
+   MEAL PICKS (one chosen food per gap, saved in the browser)
+============================================================ */
+function gapKey(day, gap){ return day+"|"+gap.start+"-"+gap.end; }
+
+// Meal and activity picks are both saved as {gap key: name}.
+function loadPickMap(storageKey){
+  try{
+    var saved = JSON.parse(localStorage.getItem(storageKey));
+    if(saved && typeof saved==="object") return saved;
+  }catch(e){ /* storage unavailable or unreadable \u2014 start with no picks */ }
+  return {};
+}
+function savePickMap(storageKey, picks){
+  try{ localStorage.setItem(storageKey, JSON.stringify(picks)); }
+  catch(e){ /* storage unavailable \u2014 picks still hold for this session */ }
+}
+function loadMealPicks(){ state.mealPicks = loadPickMap(PICKS_KEY); }
+function saveMealPicks(){ savePickMap(PICKS_KEY, state.mealPicks); }
+
+document.getElementById("gapResults").addEventListener("click", function(e){
+  var pickBtn = e.target.closest("button[data-pick]");
+  var moreBtn = e.target.closest("button[data-more]");
+  if(pickBtn){
+    var key = pickBtn.dataset.pick, food = pickBtn.dataset.food;
+    if(state.mealPicks[key]===food) delete state.mealPicks[key];
+    else state.mealPicks[key] = food;
+    saveMealPicks();
+    renderFuel();
+  } else if(moreBtn){
+    state.expandedGaps[moreBtn.dataset.more] = !state.expandedGaps[moreBtn.dataset.more];
+    renderFuel();
+  }
+});
 
 /* ============================================================
    FUEL PROFILE (weight + training load)
@@ -1154,6 +1909,7 @@ function updateProfile(weight, load){
   renderProfileInputs();
   renderCalc();
   renderFuel();
+  renderInfo();
 }
 
 function renderProfileInputs(){
@@ -1263,11 +2019,56 @@ document.getElementById("calcBtn").addEventListener("click", function(){
 });
 
 /* ============================================================
+   HOW IT WORKS (uses the saved profile, or an example weight)
+============================================================ */
+function rangeText(range){ return range[0]+"–"+range[1]; }
+
+function renderInfo(){
+  var hasWeight = state.profile.weight!==null;
+  var example = {weight: hasWeight ? state.profile.weight : EXAMPLE_WEIGHT_LB, load: state.profile.load};
+  var kg = example.weight/LB_PER_KG;
+  var carbRange = CARBS_G_PER_KG[example.load];
+  // Round to 2 decimals so 1.6 and 2.2 show a middle of 1.9, not 1.9000000000000001.
+  var proteinMid = Math.round(midpoint(PROTEIN_G_PER_KG)*100)/100, carbMid = midpoint(carbRange);
+  var goal = mealGoal(example);
+
+  document.getElementById("info-example-intro").textContent = hasWeight
+    ? "Using your numbers: "+profileLabel(example)+"."
+    : "Example: "+profileLabel(example)+". Enter your weight on Fuel to see yours.";
+
+  var steps = [
+    "<b>Weight:</b> "+example.weight+" lb = "+kg.toFixed(1)+" kg",
+    "<b>Protein:</b> "+proteinMid+" g/kg (middle of "+rangeText(PROTEIN_G_PER_KG)+") × "+kg.toFixed(1)+" kg ÷ "+
+      MEALS_PER_DAY+" meals ≈ <b>"+goal.protein+" g per meal</b>",
+    "<b>Carbs:</b> "+carbMid+" g/kg (middle of "+rangeText(carbRange)+" for "+LOAD_LABELS[example.load]+") × "+kg.toFixed(1)+" kg ÷ "+
+      MEALS_PER_DAY+" meals ≈ <b>"+goal.carbs+" g per meal</b>"
+  ];
+  document.getElementById("info-steps").innerHTML = steps.map(function(s){ return "<li>"+s+"</li>"; }).join("");
+
+  document.getElementById("info-why").textContent =
+    "Protein stays the same every day for muscle repair. Carbs fuel exercise, so they rise with training: "+
+    rangeText(CARBS_G_PER_KG.rest)+" g/kg rest, "+rangeText(CARBS_G_PER_KG.moderate)+" moderate, "+
+    rangeText(CARBS_G_PER_KG.hard)+" hard.";
+
+  // Gaps between lunch's end and dinner's start count as lunch (see mealPeriodFor), so lunch runs until dinner.
+  document.getElementById("info-gap-types").innerHTML = [
+    "<b>Pre-practice:</b> practice, lift or game within "+(PRE_PRACTICE_WINDOW_MIN/60)+" hours after. Favors carb-heavy, easy-to-digest foods.",
+    "<b>Recovery:</b> practice, lift or game ended within "+RECOVERY_WINDOW_MIN+" minutes before. Favors protein plus carbs.",
+    "<b>Meal:</b> otherwise, breakfast before "+minToClock(BREAKFAST_ENDS_MIN)+", lunch until "+minToClock(DINNER_STARTS_MIN)+", then dinner."
+  ].map(function(s){ return "<li>"+s+"</li>"; }).join("");
+}
+
+/* ============================================================
    INIT
 ============================================================ */
 function init(){
   loadCommitments();
   loadProfile();
+  loadMealPicks();
+  loadActivityPicks();
+  loadActivityDone();
+  loadCustomIdeas();
+  loadSeason();
   buildDayPick();
   buildHallFilterOptions();
   renderSchedule();
@@ -1275,6 +2076,39 @@ function init(){
   renderDirectory();
   buildFuelDaySelector();
   renderProfileInputs();
+  renderInfo();
+  document.getElementById("snapshot").addEventListener("click", function(ev){
+    var tile = ev.target.closest("[data-day]");
+    if(tile) toggleDay(tile.dataset.day);
+  });
+  document.getElementById("recapHours").addEventListener("click", function(ev){
+    var seasonBtn = ev.target.closest("[data-season]");
+    if(seasonBtn) setSeason(seasonBtn.dataset.season);
+  });
+  document.getElementById("recapTips").addEventListener("click", function(ev){
+    var planBtn = ev.target.closest("[data-plan-day]");
+    if(planBtn) planDay(planBtn.dataset.planDay);
+  });
+  document.getElementById("dayDetail").addEventListener("change", function(ev){
+    var ideaMenu = ev.target.closest("select[data-idea-gap]");
+    if(!ideaMenu) return;
+    if(ideaMenu.value===CUSTOM_OPTION){ openCustomForm(ideaMenu.dataset.ideaGap); return; }
+    state.customFormGap = null;
+    setActivityPick(ideaMenu.dataset.ideaGap, ideaMenu.value);
+  });
+  document.getElementById("dayDetail").addEventListener("click", function(ev){
+    if(ev.target.closest("[data-close-day]")) toggleDay(state.selectedDay);
+    var doneBtn = ev.target.closest("[data-done-gap]");
+    if(doneBtn) toggleActivityDone(doneBtn.dataset.doneGap);
+    if(ev.target.closest("[data-custom-save]")) saveCustomIdea(ev.target.closest(".custom-form"));
+    if(ev.target.closest("[data-custom-cancel]")){ state.customFormGap = null; renderSchedule(); }
+  });
+  // Enter in the custom form saves it.
+  document.getElementById("dayDetail").addEventListener("keydown", function(ev){
+    var form = ev.target.closest(".custom-form");
+    if(form && ev.key==="Enter" && ev.target.tagName==="INPUT"){ ev.preventDefault(); saveCustomIdea(form); }
+  });
+  showTab("schedule");
 }
 init();
 
