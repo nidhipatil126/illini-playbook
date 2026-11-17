@@ -492,7 +492,8 @@ details.acc .acc-body{padding:14px 16px;}
 .recap-table th,.recap-table td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;}
 .recap-table th{font-size:12px;text-transform:uppercase;letter-spacing:.3px;color:var(--ink-soft);}
 .recap-table th small{display:block;text-transform:none;letter-spacing:0;font-weight:600;}
-#recapFollow{margin-bottom:24px;}
+#recapFollow,#recapExams{margin-bottom:24px;}
+#recapExams td:first-child{white-space:normal;}
 #recapHours{margin-bottom:24px;padding:14px 16px;border:1.5px solid var(--line);background:var(--day-tile, var(--surface));}
 .season-switch{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
 .season-switch .pick-btn{margin-top:0;}
@@ -758,6 +759,8 @@ footer.foot{
     <div id="recapHours"></div>
     <h3 class="recap-heading">Follow-through</h3>
     <div id="recapFollow"></div>
+    <h3 class="recap-heading">Exam prep</h3>
+    <div id="recapExams"></div>
     <h3 class="recap-heading">Suggestions</h3>
     <ul class="recap-tips" id="recapTips"></ul>
     <h3 class="recap-heading">Day by day</h3>
@@ -1181,17 +1184,41 @@ function examTag(exams){
 }
 
 // The nearest exam or deadline from this date up to STUDY_FIRST_DAYS_BEFORE days later, or null.
-function upcomingExam(dateText){
-  var from = dateFromText(dateText);
-  return state.exams.map(function(x){ return {exam:x, days:Math.round((dateFromText(x.date)-from)/DAY_MS)}; })
-    .filter(function(x){ return x.days>=0 && x.days<=STUDY_FIRST_DAYS_BEFORE; })
-    .sort(function(a,b){ return a.days-b.days; })[0] || null;
-}
+function upcomingExam(dateText){ return examsInWindow(dateText)[0] || null; }
 
 function studyFirst(ideas){
   return ideas.filter(function(i){ return i.group==="study"; })
     .concat(ideas.filter(function(i){ return i.group!=="study"; }));
 }
+
+/* "Study for <exam>": a gap pick tied to one exam, saved as EXAM_STUDY_PREFIX + its id. It only shows
+   and counts on the exam's day and the STUDY_FIRST_DAYS_BEFORE days before it. */
+var EXAM_STUDY_PREFIX = "__exam:";
+var EXAM_STUDY_MIN = 60;
+
+// Exams whose study window includes this date, nearest first.
+function examsInWindow(dateText){
+  var from = dateFromText(dateText);
+  return state.exams.map(function(x){ return {exam:x, days:Math.round((dateFromText(x.date)-from)/DAY_MS)}; })
+    .filter(function(x){ return x.days>=0 && x.days<=STUDY_FIRST_DAYS_BEFORE; })
+    .sort(function(a,b){ return a.days-b.days; });
+}
+
+function gapMinutesFromKey(key){
+  var range = key.split("|")[1].split("-");
+  return +range[1] - +range[0];
+}
+
+// The study idea for one exam in one gap, or null if the exam is gone or not coming up from that day.
+function examStudyIdea(key, examId, weeksBack){
+  var dateText = dateOfThisWeek(key.split("|")[0], weeksBack);
+  var match = examsInWindow(dateText).find(function(x){ return x.exam.id===examId; });
+  if(!match) return null;
+  return {value:EXAM_STUDY_PREFIX+examId, examId:examId, name:"Study for "+match.exam.name,
+    minutes:Math.min(EXAM_STUDY_MIN, gapMinutesFromKey(key)), group:"study"};
+}
+
+function ideaValue(idea){ return idea.value || idea.name; }
 
 function shortDate(dateText){
   return new Date(dateFromText(dateText)).toLocaleDateString("en-US", {weekday:"short", month:"short", day:"numeric"});
@@ -1312,10 +1339,11 @@ function loadCustomIdeas(){
   });
 }
 
-// The idea picked for a gap, from the starter list or the user's own; null if none.
-function pickedIdeaFor(key){
+// The idea picked for a gap, from the starter list, the user's own, or studying for an exam; null if none.
+function pickedIdeaFor(key, weeksBack){
   var name = state.activityPicks[key];
   if(!name) return null;
+  if(name.indexOf(EXAM_STUDY_PREFIX)===0) return examStudyIdea(key, name.slice(EXAM_STUDY_PREFIX.length), weeksBack);
   var custom = state.customIdeas[key];
   if(custom && custom.name===name) return custom;
   return ACTIVITY_IDEAS.find(function(i){ return i.name===name; }) || null;
@@ -1438,7 +1466,7 @@ function followThrough(weeksBack){
         if(eatenKeys.some(function(k){ return k.indexOf(prefix)===0; })) result.meals.done++;
         else result.skippedMealDays[d] = (result.skippedMealDays[d]||0)+1;
       }
-      var idea = pickedIdeaFor(key);
+      var idea = pickedIdeaFor(key, weeksBack);
       if(!idea) return;
       var done = doneKeys.some(function(k){ return k.indexOf(prefix)===0; });
       result.planned++; result.groups[idea.group].planned++;
@@ -1493,6 +1521,44 @@ function renderFollowThrough(last, now){
       return '<tr><td><b>'+r.label+'</b></td><td>'+(last.hasCheckins ? cell(last, r.part) : "\u2014")+'</td><td>'+cell(now, r.part)+'</td></tr>';
     }).join("")+'</tbody></table></div>'+
     (last.hasCheckins ? '' : '<p class="recap-note">Last week has no check-ins yet. Tap <b>Mark done</b> or <b>Mark eaten</b> in a day\u2019s panel, and next Monday this fills in.</p>');
+}
+
+// This week's study time picked and done for each exam whose study days fall in this week.
+function examPrep(){
+  var byDay = expandByDay();
+  var rows = {};
+  DAYS.forEach(function(d){
+    findGaps(byDay[d]).forEach(function(g){
+      var key = gapKey(d, g);
+      var idea = pickedIdeaFor(key);
+      if(!idea || !idea.examId) return;
+      var row = rows[idea.examId] || (rows[idea.examId] = {planned:0, done:0});
+      row.planned += idea.minutes;
+      if(state.activityDone[doneKey(d, key, idea.value)]) row.done += idea.minutes;
+    });
+  });
+  var weekStart = dateOfThisWeek("Mon"), weekEnd = dateOfThisWeek("Sun");
+  return state.exams.filter(function(x){
+    return DAYS.some(function(d){ return examsInWindow(dateOfThisWeek(d)).some(function(w){ return w.exam.id===x.id; }); });
+  }).sort(function(a,b){ return a.date<b.date ? -1 : a.date>b.date ? 1 : 0; }).map(function(x){
+    var row = rows[x.id] || {planned:0, done:0};
+    return {exam:x, planned:row.planned, done:row.done, thisWeek: x.date>=weekStart && x.date<=weekEnd};
+  });
+}
+
+function renderExamPrep(){
+  var el = document.getElementById("recapExams");
+  var prep = examPrep();
+  if(!prep.length){
+    el.innerHTML = '<p class="recap-note">No exams or deadlines coming up this week. Add one on the Add tab, and “Study for …” shows up in the gaps the 3 days before.</p>';
+    return;
+  }
+  el.innerHTML = '<div class="grid-scroll"><table class="recap-table"><thead><tr><th></th><th>Planned</th><th>Done</th></tr></thead><tbody>'+
+    prep.map(function(p){
+      var when = p.thisWeek ? DAYS[(new Date(dateFromText(p.exam.date)).getDay()+6)%7] : shortDate(p.exam.date);
+      return '<tr><td><b>'+escapeHtml(p.exam.name)+'</b> <small>('+EXAM_KINDS[p.exam.kind]+' '+when+')</small></td>'+
+        '<td>'+hoursText(p.planned)+'</td><td>'+hoursText(p.done)+'</td></tr>';
+    }).join("")+'</tbody></table></div>';
 }
 
 function hoursText(mins){ return mins ? lengthText(mins) : "0h"; }
@@ -1555,6 +1621,7 @@ function renderRecap(){
   renderHourLimit(week);
   var last = followThrough(1);
   renderFollowThrough(last, followThrough(0));
+  renderExamPrep();
   document.getElementById("recapTips").innerHTML = recapSuggestions(summary, last, week).map(function(tip){
     return '<li'+(tip.good?' class="good"':'')+'><span>'+escapeHtml(tip.text)+'</span>'+
       (tip.day ? '<button type="button" class="pick-btn" data-plan-day="'+tip.day+'">Plan '+tip.day+' \u2192</button>' : '')+'</li>';
@@ -1592,12 +1659,14 @@ function renderDayDetail(byDay){
   }).concat(findGaps(events).map(function(g){
     var key = gapKey(day, g);
     var picked = state.activityPicks[key];
+    // A study pick for an exam that's passed or removed no longer counts, so the gap shows as open.
+    if(picked && picked.indexOf(EXAM_STUDY_PREFIX)===0 && !pickedIdeaFor(key)) picked = null;
     var ideas = ideasFor(g.end-g.start, classifyGap(g, events).kind);
-    if(soon) ideas = studyFirst(ideas);
+    if(soon) ideas = examsInWindow(dateText).map(function(x){ return examStudyIdea(key, x.exam.id); }).concat(studyFirst(ideas));
     var custom = state.customIdeas[key];
     if(custom && !ideas.some(function(i){ return i.name===custom.name; })) ideas.push(custom);
     // Keep a saved pick visible even if it isn't among the ideas shown now.
-    if(picked && !ideas.some(function(i){ return i.name===picked; })) ideas.push({name:picked});
+    if(picked && !ideas.some(function(i){ return ideaValue(i)===picked; })) ideas.push(pickedIdeaFor(key) || {name:picked});
     var formOpen = state.customFormGap===key;
     var meal = state.mealPicks[key];
     return {start:g.start, html:'<div class="day-detail-row free">'+
@@ -1608,7 +1677,7 @@ function renderDayDetail(byDay){
         '<select class="idea-select'+(picked?' is-picked':'')+'" data-idea-gap="'+escapeAttr(key)+'" aria-label="Something to do '+minToClock(g.start)+' to '+minToClock(g.end)+'">'+
           '<option value="">Pick something to do\u2026</option>'+
           ideas.map(function(idea){
-            return '<option value="'+escapeAttr(idea.name)+'"'+(idea.name===picked && !formOpen?' selected':'')+'>'+
+            return '<option value="'+escapeAttr(ideaValue(idea))+'"'+(ideaValue(idea)===picked && !formOpen?' selected':'')+'>'+
               escapeHtml(idea.name)+(idea.minutes?' \u00b7 '+lengthText(idea.minutes):'')+'</option>';
           }).join("")+
           '<option value="'+CUSTOM_OPTION+'"'+(formOpen?' selected':'')+'>Something else\u2026</option>'+
