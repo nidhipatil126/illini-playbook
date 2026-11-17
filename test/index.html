@@ -163,12 +163,18 @@ p.section-sub{margin:0 0 18px;color:var(--ink-soft);font-size:14px;font-weight:6
   display:flex;gap:3px;white-space:nowrap;
 }
 .snap-day .busy-tag,
-.snap-day .today-tag{
+.snap-day .today-tag,
+.snap-day .exam-tag{
   color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.5px;
   text-transform:uppercase;padding:2px 6px;
 }
 .snap-day .busy-tag{background:var(--orange);}
 .snap-day .today-tag{background:var(--navy);}
+.snap-day .exam-tag{background:var(--turf);}
+.day-exams{margin:0 0 10px;padding:0;list-style:none;}
+.day-exams li{font-size:14px;font-weight:700;color:var(--turf);padding:2px 0;}
+.study-first-note{margin:0 0 10px;font-size:13px;color:var(--ink-soft);}
+#examForm .form-grid{align-items:end;}
 .snap-day.selected{
   border:3px solid var(--orange);
   background:color-mix(in srgb, var(--orange) 22%, var(--day-tile, var(--surface)));
@@ -633,6 +639,33 @@ footer.foot{
       <summary><span id="commitSummary">Your commitments</span><span class="chev">⌄</span></summary>
       <div class="acc-body commit-list" id="commitList"></div>
     </details>
+
+    <h2 class="section-title" style="margin-top:34px;">Exams &amp; deadlines</h2>
+    <p class="section-sub">One-time dates. The days before an exam or deadline put Study ideas first.</p>
+    <form class="card" id="examForm" style="padding:20px;" novalidate>
+      <div class="form-grid">
+        <div>
+          <label for="exam-name">Name</label>
+          <input type="text" id="exam-name" placeholder="CS 124 midterm, Essay" maxlength="60">
+        </div>
+        <div>
+          <label for="exam-date">Date</label>
+          <input type="date" id="exam-date">
+        </div>
+        <div class="full">
+          <label>Kind</label>
+          <div class="daypick" id="examKind">
+            <label><input type="radio" name="exam-kind" value="exam" checked> Exam</label>
+            <label><input type="radio" name="exam-kind" value="due"> Due</label>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:18px;display:flex;gap:10px;align-items:center;">
+        <button type="submit" class="btn" id="examAddBtn">Add</button>
+        <span id="examMsg" role="status" style="font-size:13px;font-weight:700;"></span>
+      </div>
+    </form>
+    <div class="commit-list" id="examList"></div>
   </section>
 
   <!-- ============ FUEL TAB ============ -->
@@ -851,6 +884,7 @@ var ACTIVITY_DONE_KEY = STORAGE_PREFIX + "illini-playbook-activity-done-v1";
 var CUSTOM_IDEAS_KEY = STORAGE_PREFIX + "illini-playbook-custom-ideas-v1";
 var SEASON_KEY = STORAGE_PREFIX + "illini-playbook-season-v1";
 var MEAL_EATEN_KEY = STORAGE_PREFIX + "illini-playbook-meal-eaten-v1";
+var EXAMS_KEY = STORAGE_PREFIX + "illini-playbook-exams-v1";
 if (IS_TEST_COPY) {
   var testBanner = document.createElement("p");
   testBanner.className = "test-copy-banner";
@@ -891,7 +925,8 @@ var state = {
   customIdeas: {},    // gap key -> {name, minutes, group} the user typed in for that gap
   customFormGap: null, // gap key whose "Something else" form is open, or null
   season: "in",        // "in" or "out" of season, for the NCAA hour limit
-  mealEaten: {}        // eaten key (date + gap key + food) -> true
+  mealEaten: {},       // eaten key (date + gap key + food) -> true
+  exams: []            // one-time exams and deadlines: {id, name, date:"2026-11-19", kind:"exam"|"due"}
 };
 
 function loadCommitments(){
@@ -1039,7 +1074,8 @@ function renderSnapshot(byDay){
       ? '<span class="free-label">Free day</span>'
       : '<div class="bar" style="height:'+barH.toFixed(0)+'px"></div>';
     var tags = (d===today ? '<span class="today-tag">Today</span>' : '')+
-      (i===busiestIdx && max>0 ? '<span class="busy-tag">Busiest</span>' : '');
+      (i===busiestIdx && max>0 ? '<span class="busy-tag">Busiest</span>' : '')+
+      examTag(examsOn(dateOfThisWeek(d)));
     var classes = "snap-day"+(i===busiestIdx && max>0 ? " busiest":"")+(state.selectedDay===d ? " selected":"");
     return '<button type="button" class="'+classes+'" data-day="'+d+'" aria-expanded="'+(state.selectedDay===d)+'" aria-controls="dayDetail">'+
       (tags ? '<span class="tile-tags">'+tags+'</span>' : '')+
@@ -1113,6 +1149,96 @@ function dateOfThisWeek(day, weeksBack){
 }
 
 function loadActivityDone(){ state.activityDone = loadPickMap(ACTIVITY_DONE_KEY); }
+
+/* Exams and deadlines: one-time dates, unlike the weekly commitments. */
+var EXAM_KINDS = {exam:"Exam", due:"Due"};
+var MAX_EXAM_NAME = 60;
+// Study ideas come first on the exam's day and this many days before it.
+var STUDY_FIRST_DAYS_BEFORE = 3;
+var DAY_MS = 24*60*60*1000;
+
+function loadExams(){
+  var saved;
+  try{ saved = JSON.parse(localStorage.getItem(EXAMS_KEY)); }
+  catch(e){ saved = null; /* unreadable \u2014 start with no exams */ }
+  state.exams = Array.isArray(saved) ? saved.filter(function(x){
+    return x && typeof x.name==="string" && x.name && isDateText(x.date) && EXAM_KINDS[x.kind];
+  }) : [];
+}
+function saveExams(){
+  try{ localStorage.setItem(EXAMS_KEY, JSON.stringify(state.exams)); }
+  catch(e){ /* storage unavailable \u2014 exams still hold for this session */ }
+}
+function isDateText(text){ return typeof text==="string" && /^\d{4}-\d{2}-\d{2}$/.test(text) && !isNaN(dateFromText(text)); }
+function dateFromText(text){ var p = text.split("-"); return new Date(+p[0], +p[1]-1, +p[2]).getTime(); }
+function examsOn(dateText){ return state.exams.filter(function(x){ return x.date===dateText; }); }
+
+// An Exam tag wins over a Due tag when a day has both.
+function examTag(exams){
+  if(!exams.length) return "";
+  var kind = exams.some(function(x){ return x.kind==="exam"; }) ? "exam" : "due";
+  return '<span class="exam-tag">'+EXAM_KINDS[kind]+'</span>';
+}
+
+// The nearest exam or deadline from this date up to STUDY_FIRST_DAYS_BEFORE days later, or null.
+function upcomingExam(dateText){
+  var from = dateFromText(dateText);
+  return state.exams.map(function(x){ return {exam:x, days:Math.round((dateFromText(x.date)-from)/DAY_MS)}; })
+    .filter(function(x){ return x.days>=0 && x.days<=STUDY_FIRST_DAYS_BEFORE; })
+    .sort(function(a,b){ return a.days-b.days; })[0] || null;
+}
+
+function studyFirst(ideas){
+  return ideas.filter(function(i){ return i.group==="study"; })
+    .concat(ideas.filter(function(i){ return i.group!=="study"; }));
+}
+
+function shortDate(dateText){
+  return new Date(dateFromText(dateText)).toLocaleDateString("en-US", {weekday:"short", month:"short", day:"numeric"});
+}
+
+function renderExamList(){
+  var el = document.getElementById("examList");
+  // From this Monday on, so this week's earlier exams still match their day tags.
+  var weekStart = dateOfThisWeek("Mon");
+  var upcoming = state.exams.filter(function(x){ return x.date>=weekStart; })
+    .sort(function(a,b){ return a.date<b.date ? -1 : a.date>b.date ? 1 : 0; });
+  if(!upcoming.length){ el.innerHTML = '<p class="empty-note">No upcoming exams or deadlines.</p>'; return; }
+  el.innerHTML = upcoming.map(function(x){
+    return '<div class="commit-row">'+
+      '<div class="swatch" style="background:var(--turf);"></div>'+
+      '<div class="info"><b>'+escapeHtml(x.name)+'</b><div class="meta">'+EXAM_KINDS[x.kind]+' \u00b7 '+shortDate(x.date)+'</div></div>'+
+      '<div class="actions"><button class="icon" data-exam-del="'+escapeAttr(x.id)+'" style="color:var(--danger);">Remove</button></div>'+
+      '</div>';
+  }).join("");
+}
+
+function addExam(form){
+  var msg = document.getElementById("examMsg");
+  var name = document.getElementById("exam-name").value.trim();
+  var date = document.getElementById("exam-date").value;
+  var kind = form.querySelector('input[name="exam-kind"]:checked').value;
+  msg.style.color = "var(--danger)";
+  if(!name){ msg.textContent = "Give it a name."; return; }
+  if(name.length > MAX_EXAM_NAME){ msg.textContent = "Keep the name under "+MAX_EXAM_NAME+" characters."; return; }
+  if(!isDateText(date)){ msg.textContent = "Pick a date."; return; }
+  state.exams.push({id:"exam"+Date.now(), name:name, date:date, kind:kind});
+  saveExams();
+  document.getElementById("exam-name").value = "";
+  document.getElementById("exam-date").value = "";
+  msg.style.color = "var(--turf)";
+  msg.textContent = "Added "+name+" ("+shortDate(date)+").";
+  renderExamList();
+  renderSchedule();
+}
+
+function removeExam(id){
+  state.exams = state.exams.filter(function(x){ return x.id!==id; });
+  saveExams();
+  document.getElementById("examMsg").textContent = "";
+  renderExamList();
+  renderSchedule();
+}
 
 /* "Something else…": the user's own activity for one gap, with its length and Recap group. */
 var CUSTOM_OPTION = "__custom";
@@ -1454,6 +1580,8 @@ function renderDayDetail(byDay){
   var day = state.selectedDay;
   if(!day){ el.innerHTML = ""; return; }
   var events = byDay[day];
+  var dateText = dateOfThisWeek(day);
+  var soon = upcomingExam(dateText);
   var rows = events.map(function(e){
     var meta = TYPE_META[e.ref.type] || TYPE_META.other;
     return {start:e.startMin, html:'<div class="day-detail-row">'+
@@ -1465,6 +1593,7 @@ function renderDayDetail(byDay){
     var key = gapKey(day, g);
     var picked = state.activityPicks[key];
     var ideas = ideasFor(g.end-g.start, classifyGap(g, events).kind);
+    if(soon) ideas = studyFirst(ideas);
     var custom = state.customIdeas[key];
     if(custom && !ideas.some(function(i){ return i.name===custom.name; })) ideas.push(custom);
     // Keep a saved pick visible even if it isn't among the ideas shown now.
@@ -1495,6 +1624,9 @@ function renderDayDetail(byDay){
   el.innerHTML = '<div class="day-detail" role="region" aria-label="'+DAY_FULL[day]+' details">'+
     '<div class="day-detail-head"><h3>'+DAY_FULL[day]+'</h3>'+
     '<button type="button" class="btn secondary" data-close-day>Close</button></div>'+
+    examLines(examsOn(dateText))+
+    (soon ? '<p class="study-first-note">'+escapeHtml(soon.exam.name)+' '+
+      (soon.days===0 ? 'is today' : 'in '+soon.days+' day'+(soon.days>1?'s':''))+' \u2014 Study ideas are listed first.</p>' : '')+
     gameFuelCard(events)+body+'</div>';
 }
 
@@ -1531,6 +1663,13 @@ function gameFuelCard(events){
       return '<li'+(step.isGame?' class="is-game"':'')+'><span class="time">'+step.time+'</span>'+
         '<span>'+escapeHtml(step.what)+'<small>'+escapeHtml(step.note)+'</small></span></li>';
     }).join("")+'</ol></div>';
+}
+
+function examLines(exams){
+  if(!exams.length) return "";
+  return '<ul class="day-exams">'+exams.map(function(x){
+    return '<li>'+EXAM_KINDS[x.kind]+': '+escapeHtml(x.name)+'</li>';
+  }).join("")+'</ul>';
 }
 
 function mealLine(key, meal, isEaten){
@@ -2152,14 +2291,24 @@ function init(){
   loadCustomIdeas();
   loadSeason();
   loadMealEaten();
+  loadExams();
   buildDayPick();
   buildHallFilterOptions();
   renderSchedule();
   renderCommitList();
+  renderExamList();
   renderDirectory();
   buildFuelDaySelector();
   renderProfileInputs();
   renderInfo();
+  document.getElementById("examForm").addEventListener("submit", function(ev){
+    ev.preventDefault();
+    addExam(ev.currentTarget);
+  });
+  document.getElementById("examList").addEventListener("click", function(ev){
+    var delBtn = ev.target.closest("[data-exam-del]");
+    if(delBtn) removeExam(delBtn.dataset.examDel);
+  });
   document.getElementById("snapshot").addEventListener("click", function(ev){
     var tile = ev.target.closest("[data-day]");
     if(tile) toggleDay(tile.dataset.day);
