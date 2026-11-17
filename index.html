@@ -352,6 +352,11 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .btn.ghost{background:transparent;color:var(--danger);border-color:var(--danger);box-shadow:none;font-size:13px;padding:4px 10px;font-family:var(--font-body);font-weight:700;}
 
 .commit-list{margin-top:26px;}
+.start-fresh{border:2px dashed var(--ink-soft);background:var(--day-tile, var(--surface));padding:12px 16px;margin:0 0 18px;font-size:14.5px;}
+.start-fresh p{margin:0 0 10px;}
+.start-fresh .start-fresh-actions{display:flex;flex-wrap:wrap;gap:8px;}
+.start-fresh .btn{font-size:16px;padding:6px 14px 4px;}
+.start-fresh .btn.danger{background:var(--danger);}
 .commit-row{
   display:flex;align-items:center;gap:12px;padding:10px 12px;border:2px solid var(--line);
   background:var(--surface);margin-bottom:8px;
@@ -606,6 +611,8 @@ footer.foot{
   <section class="tab" id="tab-add">
     <h2 class="section-title">Add a commitment</h2>
     <p class="section-sub">Repeats weekly on the days you pick.</p>
+
+    <div class="start-fresh" id="startFresh" role="region" aria-label="Start fresh" aria-live="polite"></div>
 
     <form class="card" id="commitForm" style="padding:20px;">
       <div class="form-grid">
@@ -955,6 +962,20 @@ var state = {
   exams: []            // one-time exams and deadlines: {id, name, date:"2026-11-19", kind:"exam"|"due"}
 };
 
+// A sample athlete week, shown on a first visit and by "Load the sample week".
+var SAMPLE_WEEK = [
+  {id:"seed1", title:"Morning lift", type:"lift", days:["Mon","Wed","Fri"], start:"06:00", end:"07:15", loc:"Ubben Basketball Complex", notes:""},
+  {id:"seed2", title:"KIN 250 lecture", type:"class", days:["Mon","Wed","Fri"], start:"09:00", end:"09:50", loc:"Freer Hall", notes:""},
+  {id:"seed3", title:"Team practice", type:"practice", days:["Mon","Tue","Wed","Thu","Fri"], start:"14:30", end:"17:00", loc:"State Farm Center", notes:""},
+  {id:"seed4", title:"SAAC meeting", type:"club", days:["Tue"], start:"18:00", end:"19:00", loc:"Bielfeldt Athletic Administration Bldg", notes:""},
+  {id:"seed5", title:"ENG 100 discussion", type:"class", days:["Tue","Thu"], start:"11:00", end:"12:15", loc:"Grainger Library", notes:""},
+  {id:"seed6", title:"Team film session", type:"film", days:["Sat"], start:"10:00", end:"11:00", loc:"State Farm Center", notes:""},
+  {id:"seed7", title:"Game", type:"game", days:["Sat"], start:"13:00", end:"16:00", loc:"State Farm Center", notes:""},
+  {id:"seed8", title:"Treatment", type:"treatment", days:["Sun"], start:"10:00", end:"11:00", loc:"Ubben Basketball Complex", notes:""},
+  {id:"seed9", title:"Study hall", type:"studyhall", days:["Sun"], start:"14:00", end:"16:00", loc:"Grainger Library", notes:""}
+];
+function sampleWeek(){ return SAMPLE_WEEK.map(function(c){ return Object.assign({}, c, {days:c.days.slice()}); }); }
+
 function loadCommitments(){
   try{
     var raw = localStorage.getItem(STORAGE_KEY);
@@ -964,17 +985,7 @@ function loadCommitments(){
     }
   }catch(e){ /* storage unavailable or empty — fall through to seed */ }
   // seed with a light example so the board isn't empty on first visit
-  state.commitments = [
-    {id:"seed1", title:"Morning lift", type:"lift", days:["Mon","Wed","Fri"], start:"06:00", end:"07:15", loc:"Ubben Basketball Complex", notes:""},
-    {id:"seed2", title:"KIN 250 lecture", type:"class", days:["Mon","Wed","Fri"], start:"09:00", end:"09:50", loc:"Freer Hall", notes:""},
-    {id:"seed3", title:"Team practice", type:"practice", days:["Mon","Tue","Wed","Thu","Fri"], start:"14:30", end:"17:00", loc:"State Farm Center", notes:""},
-    {id:"seed4", title:"SAAC meeting", type:"club", days:["Tue"], start:"18:00", end:"19:00", loc:"Bielfeldt Athletic Administration Bldg", notes:""},
-    {id:"seed5", title:"ENG 100 discussion", type:"class", days:["Tue","Thu"], start:"11:00", end:"12:15", loc:"Grainger Library", notes:""},
-    {id:"seed6", title:"Team film session", type:"film", days:["Sat"], start:"10:00", end:"11:00", loc:"State Farm Center", notes:""},
-    {id:"seed7", title:"Game", type:"game", days:["Sat"], start:"13:00", end:"16:00", loc:"State Farm Center", notes:""},
-    {id:"seed8", title:"Treatment", type:"treatment", days:["Sun"], start:"10:00", end:"11:00", loc:"Ubben Basketball Complex", notes:""},
-    {id:"seed9", title:"Study hall", type:"studyhall", days:["Sun"], start:"14:00", end:"16:00", loc:"Grainger Library", notes:""}
-  ];
+  state.commitments = sampleWeek();
 }
 function saveCommitments(){
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state.commitments)); }
@@ -1891,13 +1902,16 @@ function nextUpLines(byDay, now){
   if(fuelStep) lines.push('<p class="sub">Game fuel: <b>'+escapeHtml(fuelStep.what)+'</b> '+(fuelStep.time.indexOf("When")===0 ? fuelStep.time.toLowerCase() : 'at '+fuelStep.time)+'</p>');
 
   var next = events.find(function(e){ return e.startMin>minute; });
+  if(state.commitments.length===0){
+    return {day:day, html:'<p><b>No commitments yet.</b> Add your week on the Add tab, and this shows what\u2019s now and next.</p>'};
+  }
   if(next){
     lines.push('<p><b>Next:</b> '+escapeHtml(next.ref.title)+' \u00b7 '+minToClock(next.startMin)+' \u00b7 in '+lengthText(next.startMin-minute)+'</p>'+
       (next.ref.loc ? '<p class="sub">'+escapeHtml(next.ref.loc)+'</p>' : ''));
   } else {
     var tomorrow = DAYS[(DAYS.indexOf(day)+1)%7];
     var first = byDay[tomorrow].slice().sort(function(a,b){ return a.startMin-b.startMin; })[0];
-    lines.push('<p><b>Done for today.</b> '+(first
+    lines.push('<p><b>'+(events.length ? 'Done for today.' : 'Nothing scheduled today.')+'</b> '+(first
       ? 'Tomorrow starts with '+escapeHtml(first.ref.title)+' at '+minToClock(first.startMin)+'.'
       : 'Tomorrow is free.')+'</p>');
   }
@@ -1923,7 +1937,58 @@ function renderSchedule(){
 /* ============================================================
    ADD / EDIT / DELETE COMMITMENTS
 ============================================================ */
+/* Start fresh: clear the week (and every pick, check-in and exam tied to it), or load the sample week back.
+   Weight, season and the tour stay as they are. */
+var startFreshConfirming = false;
+// A short note ("Cleared.") shown until the number of commitments changes.
+var startFreshMessage = {text:"", count:-1};
+
+function isSampleWeek(){
+  return state.commitments.length===SAMPLE_WEEK.length &&
+    state.commitments.every(function(c){ return JSON.stringify(c)===JSON.stringify(SAMPLE_WEEK.find(function(x){ return x.id===c.id; })); });
+}
+
+function renderStartFresh(){
+  var el = document.getElementById("startFresh");
+  var note = startFreshMessage.count===state.commitments.length ? '<b>'+startFreshMessage.text+'</b> ' : '';
+  var html;
+  if(state.commitments.length===0){
+    html = '<p>'+note+'No commitments yet. Add your own below, or load the sample week to see how the app works.</p>'+
+      '<div class="start-fresh-actions"><button type="button" class="btn secondary" data-load-sample>Load the sample week</button></div>';
+  } else if(startFreshConfirming){
+    html = '<p><b>Clear everything?</b> This removes your commitments, picks, Mark done and Mark eaten check-ins, custom ideas and exams. It can\u2019t be undone.</p>'+
+      '<div class="start-fresh-actions"><button type="button" class="btn danger" data-start-fresh-yes>Yes, start fresh</button>'+
+      '<button type="button" class="btn secondary" data-start-fresh-cancel>Cancel</button></div>';
+  } else {
+    html = '<p>'+note+
+      (isSampleWeek() ? 'This is a sample week. Start fresh to enter your own.' : 'Want a blank week? Start fresh clears everything.')+'</p>'+
+      '<div class="start-fresh-actions"><button type="button" class="btn secondary" data-start-fresh>Start fresh</button></div>';
+  }
+  el.innerHTML = html;
+}
+
+function startFresh(){
+  state.commitments = [];
+  state.mealPicks = {}; state.activityPicks = {}; state.activityDone = {};
+  state.customIdeas = {}; state.mealEaten = {}; state.exams = [];
+  state.expandedGaps = {}; state.selectedDay = null; state.customFormGap = null;
+  saveCommitments();
+  [PICKS_KEY, ACTIVITY_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY, MEAL_EATEN_KEY].forEach(function(key){ savePickMap(key, {}); });
+  saveExams();
+  startFreshConfirming = false;
+  startFreshMessage = {text:"Cleared.", count:0};
+  renderCommitList(); renderExamList(); renderSchedule();
+}
+
+function loadSampleWeek(){
+  state.commitments = sampleWeek();
+  saveCommitments();
+  startFreshMessage = {text:"Sample week loaded.", count:state.commitments.length};
+  renderCommitList(); renderSchedule();
+}
+
 function renderCommitList(){
+  renderStartFresh();
   var el = document.getElementById("commitList");
   var summaryEl = document.getElementById("commitSummary");
   if(summaryEl) summaryEl.textContent = "Your commitments (" + state.commitments.length + ")";
@@ -2507,6 +2572,12 @@ function init(){
     if(form && ev.key==="Enter" && ev.target.tagName==="INPUT"){ ev.preventDefault(); saveCustomIdea(form); }
   });
   document.getElementById("tourReplay").addEventListener("click", function(){ startTour(); });
+  document.getElementById("startFresh").addEventListener("click", function(ev){
+    if(ev.target.closest("[data-start-fresh]")){ startFreshConfirming = true; renderStartFresh(); }
+    if(ev.target.closest("[data-start-fresh-cancel]")){ startFreshConfirming = false; renderStartFresh(); }
+    if(ev.target.closest("[data-start-fresh-yes]")) startFresh();
+    if(ev.target.closest("[data-load-sample]")) loadSampleWeek();
+  });
   showTab("schedule");
   if(!tourSeen()) startTour();
 }
