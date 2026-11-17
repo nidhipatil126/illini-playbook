@@ -181,6 +181,13 @@ p.section-sub{margin:0 0 18px;color:var(--ink-soft);font-size:14px;font-weight:6
 }
 
 /* The open day's details: display only, so flat. */
+.next-up{border:2px solid var(--ink);border-left:8px solid var(--orange);background:var(--day-tile, var(--surface));
+  padding:12px 16px;margin:0 0 30px;box-shadow:var(--shadow);font-size:15px;}
+.next-up h3{margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-soft);}
+.next-up p{margin:0 0 4px;}
+.next-up .sub{margin:0 0 6px 16px;font-size:13.5px;color:var(--ink-soft);}
+.next-up .sub b{color:var(--ink);}
+.next-up .done-btn,.next-up .pick-btn{margin:0 0 0 6px;padding:2px 8px;font-size:12px;vertical-align:middle;}
 .day-detail{border:2px solid var(--line);background:var(--day-tile, var(--surface));padding:14px 16px 10px;margin:-10px 0 26px;}
 .day-detail-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;}
 .day-detail-head h3{margin:0;font-family:var(--font-display);font-size:24px;font-weight:600;line-height:1.1;}
@@ -557,6 +564,7 @@ footer.foot{
     <h2 class="section-title">Weekly board</h2>
     <p class="section-sub">Tap a day to see its plan and free time. Red striped outlines mean two commitments overlap.</p>
 
+    <div id="nextUp"></div>
     <div class="snapshot" id="snapshot"></div>
     <div id="dayDetail"></div>
 
@@ -1713,14 +1721,15 @@ function gameDayFuel(events){
   var start = game.startMin;
   var mealFrom = start - GAME_MEAL_EARLIEST_MIN, mealTo = start - GAME_MEAL_LATEST_MIN;
   var meal = mealFrom >= EARLY_GAME_MEAL_FLOOR_MIN
-    ? {time:minToClock(mealFrom)+"\u2013"+minToClock(mealTo), what:"Full meal", note:"Carb-heavy and easy to digest"}
-    : {time:"When you wake up", what:"Light breakfast", note:"Early game \u2014 keep it small and carb-heavy"};
+    ? {time:minToClock(mealFrom)+"\u2013"+minToClock(mealTo), until:mealTo, what:"Full meal", note:"Carb-heavy and easy to digest"}
+    : {time:"When you wake up", until:start-GAME_WATER_BEFORE_MIN, what:"Light breakfast", note:"Early game \u2014 keep it small and carb-heavy"};
+  // "until" is the last minute each step still makes sense, used by the Next up banner.
   return [
     meal,
-    {time:minToClock(start-GAME_WATER_BEFORE_MIN), what:"Water", note:"Drink 16\u201320 oz"},
-    {time:minToClock(start-GAME_SNACK_BEFORE_MIN), what:"Small snack", note:"Banana, granola bar or crackers"},
-    {time:minToClock(start), what:game.ref.title, note:"Keep sipping water during", isGame:true},
-    {time:minToClock(game.endMin), what:"Refill water", note:"Drink to replace what you sweated out"}
+    {time:minToClock(start-GAME_WATER_BEFORE_MIN), until:start-GAME_WATER_BEFORE_MIN, what:"Water", note:"Drink 16\u201320 oz"},
+    {time:minToClock(start-GAME_SNACK_BEFORE_MIN), until:start-GAME_SNACK_BEFORE_MIN, what:"Small snack", note:"Banana, granola bar or crackers"},
+    {time:minToClock(start), until:game.endMin, what:game.ref.title, note:"Keep sipping water during", isGame:true},
+    {time:minToClock(game.endMin), until:game.endMin+60, what:"Refill water", note:"Drink to replace what you sweated out"}
   ];
 }
 
@@ -1824,8 +1833,72 @@ function escapeHtml(s){
 }
 function escapeAttr(s){ return escapeHtml(s); }
 
+/* Next up: what's happening now and next today, at the top of Schedule. */
+var NEXT_UP_REFRESH_MS = 60*1000;
+
+// The current time. Tests can pass ?now=2026-11-16T13:40 to see the banner at a set time.
+function clockNow(){
+  var forced = new URLSearchParams(location.search).get("now");
+  if(forced && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(forced)){
+    var parts = forced.split(/[-T:]/).map(Number);
+    var date = new Date(parts[0], parts[1]-1, parts[2], parts[3], parts[4]);
+    if(!isNaN(date)) return date;
+  }
+  return new Date();
+}
+
+function nextUpLines(byDay, now){
+  var day = DAYS[(now.getDay()+6)%7];
+  var minute = now.getHours()*60 + now.getMinutes();
+  var events = byDay[day].slice().sort(function(a,b){ return a.startMin-b.startMin; });
+  var lines = [];
+  var current = events.find(function(e){ return e.startMin<=minute && minute<e.endMin; });
+  var gap = current ? null : findGaps(events).find(function(g){ return g.start<=minute && minute<g.end; });
+
+  if(current){
+    lines.push('<p><b>Now:</b> '+escapeHtml(current.ref.title)+' until '+minToClock(current.endMin)+
+      (current.ref.loc ? ' \u00b7 '+escapeHtml(current.ref.loc) : '')+'</p>');
+  } else if(gap){
+    var key = gapKey(day, gap);
+    var idea = pickedIdeaFor(key);
+    var meal = state.mealPicks[key];
+    lines.push('<p><b>Now:</b> Free until '+minToClock(gap.end)+' ('+lengthText(gap.end-minute)+' left)</p>');
+    if(idea) lines.push('<p class="sub">Planned: <b>'+escapeHtml(idea.name)+'</b></p>');
+    if(meal){
+      var eaten = state.mealEaten[doneKey(day, key, meal)];
+      lines.push('<p class="sub">Meal: <b>'+escapeHtml(meal)+'</b> <button type="button" class="done-btn'+(eaten?' is-done':'')+
+        '" data-eaten-gap="'+escapeAttr(key)+'" aria-pressed="'+!!eaten+'">'+(eaten ? '\u2713 Eaten' : 'Mark eaten')+'</button></p>');
+    }
+    if(!idea && !meal) lines.push('<p class="sub">Nothing planned <button type="button" class="pick-btn" data-plan-day="'+day+'">Plan it \u2192</button></p>');
+  }
+
+  var fuelStep = (gameDayFuel(events) || []).find(function(step){ return !step.isGame && step.until>=minute; });
+  if(fuelStep) lines.push('<p class="sub">Game fuel: <b>'+escapeHtml(fuelStep.what)+'</b> '+(fuelStep.time.indexOf("When")===0 ? fuelStep.time.toLowerCase() : 'at '+fuelStep.time)+'</p>');
+
+  var next = events.find(function(e){ return e.startMin>minute; });
+  if(next){
+    lines.push('<p><b>Next:</b> '+escapeHtml(next.ref.title)+' \u00b7 '+minToClock(next.startMin)+' \u00b7 in '+lengthText(next.startMin-minute)+'</p>'+
+      (next.ref.loc ? '<p class="sub">'+escapeHtml(next.ref.loc)+'</p>' : ''));
+  } else {
+    var tomorrow = DAYS[(DAYS.indexOf(day)+1)%7];
+    var first = byDay[tomorrow].slice().sort(function(a,b){ return a.startMin-b.startMin; })[0];
+    lines.push('<p><b>Done for today.</b> '+(first
+      ? 'Tomorrow starts with '+escapeHtml(first.ref.title)+' at '+minToClock(first.startMin)+'.'
+      : 'Tomorrow is free.')+'</p>');
+  }
+  return {day:day, html:lines.join("")};
+}
+
+function renderNextUp(byDay){
+  var now = clockNow();
+  var result = nextUpLines(byDay || expandByDay(), now);
+  document.getElementById("nextUp").innerHTML = '<div class="next-up" role="region" aria-label="Next up">'+
+    '<h3>Next up \u00b7 '+result.day+' '+minToClock(now.getHours()*60+now.getMinutes())+'</h3>'+result.html+'</div>';
+}
+
 function renderSchedule(){
   var byDay = expandByDay();
+  renderNextUp(byDay);
   renderSnapshot(byDay);
   renderDayDetail(byDay);
   renderConflictBanner(byDay);
@@ -2378,6 +2451,13 @@ function init(){
     var delBtn = ev.target.closest("[data-exam-del]");
     if(delBtn) removeExam(delBtn.dataset.examDel);
   });
+  document.getElementById("nextUp").addEventListener("click", function(ev){
+    var eatenBtn = ev.target.closest("[data-eaten-gap]");
+    if(eatenBtn) toggleMealEaten(eatenBtn.dataset.eatenGap);
+    var planBtn = ev.target.closest("[data-plan-day]");
+    if(planBtn) planDay(planBtn.dataset.planDay);
+  });
+  setInterval(function(){ renderNextUp(); }, NEXT_UP_REFRESH_MS);
   document.getElementById("snapshot").addEventListener("click", function(ev){
     var tile = ev.target.closest("[data-day]");
     if(tile) toggleDay(tile.dataset.day);
