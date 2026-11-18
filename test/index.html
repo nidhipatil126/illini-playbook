@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <title>Illini Playbook — Practice, Class &amp; Fuel Planner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Lets the app be added to a phone's home screen, where it opens full screen as "Playbook". -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#13294B">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PB Test">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -183,6 +191,14 @@ p.section-sub{margin:0 0 18px;color:var(--ink-soft);font-size:14px;font-weight:6
 /* The open day's details: display only, so flat. */
 .next-up{border:2px solid var(--ink);border-left:8px solid var(--orange);background:var(--day-tile, var(--surface));
   padding:12px 16px;margin:0 0 30px;box-shadow:var(--shadow);font-size:15px;}
+/* "Add to your home screen" tip, on phone browsers only. */
+.install-tip{position:relative;border:2px solid var(--ink);border-left:8px solid var(--navy);background:var(--surface);
+  padding:12px 44px 12px 16px;margin:0 0 16px;box-shadow:var(--shadow);font-size:14.5px;}
+.install-tip p{margin:0 0 4px;}
+.install-tip small{display:block;color:var(--ink-soft);font-size:12.5px;}
+.install-tip .btn{margin-top:8px;font-size:16px;padding:5px 14px 3px;}
+.install-tip-close{position:absolute;top:6px;right:6px;width:36px;height:36px;font:inherit;font-size:22px;line-height:1;
+  cursor:pointer;background:none;border:none;color:var(--ink-soft);}
 .next-up h3{margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-soft);}
 .next-up p{margin:0 0 4px;}
 .next-up .sub{margin:0 0 6px 16px;font-size:13.5px;color:var(--ink-soft);}
@@ -599,6 +615,7 @@ footer.foot{
     <h2 class="section-title">Weekly board</h2>
     <p class="section-sub">Tap a day to see its plan and free time. Red striped outlines mean two commitments overlap.</p>
 
+    <div id="installTip"></div>
     <div id="nextUp"></div>
     <div class="snapshot" id="snapshot"></div>
     <div id="dayDetail"></div>
@@ -935,6 +952,7 @@ var SEASON_KEY = STORAGE_PREFIX + "illini-playbook-season-v1";
 var TOUR_SEEN_KEY = STORAGE_PREFIX + "illini-playbook-tour-seen-v1";
 var MEAL_EATEN_KEY = STORAGE_PREFIX + "illini-playbook-meal-eaten-v1";
 var EXAMS_KEY = STORAGE_PREFIX + "illini-playbook-exams-v1";
+var INSTALL_TIP_KEY = STORAGE_PREFIX + "illini-playbook-install-tip-v1";
 var WEEK_CHANGES_KEY = STORAGE_PREFIX + "illini-playbook-week-changes-v1";
 if (IS_TEST_COPY) {
   var testBanner = document.createElement("p");
@@ -2736,6 +2754,7 @@ function init(){
   });
   showTab("schedule");
   if(!tourSeen()) startTour();
+  setUpInstall();
 }
 
 /* ============================================================
@@ -2810,6 +2829,79 @@ function endTour(){
   if(card) card.remove();
   try{ localStorage.setItem(TOUR_SEEN_KEY, "yes"); }
   catch(e){ /* storage unavailable \u2014 the tour may show again next visit */ }
+  renderInstallTip();
+}
+
+/* ============================================================
+   HOME SCREEN INSTALL
+============================================================ */
+// Android's Chrome offers its own Install prompt, saved here so the tip's button can open it.
+var installPrompt = null;
+
+function isInstalled(){
+  return (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone===true;
+}
+
+// "ios", "android" or null (a computer, or already opened from the home screen).
+// ?platform=ios or ?platform=android tries the tip on a computer.
+function installTipKind(){
+  var forced = new URLSearchParams(location.search).get("platform");
+  if(forced==="ios" || forced==="android") return forced;
+  if(isInstalled()) return null;
+  var ua = navigator.userAgent;
+  if(/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "ios";
+  if(/Android/.test(ua)) return "android";
+  return null;
+}
+
+function installTipDismissed(){
+  try{ return localStorage.getItem(INSTALL_TIP_KEY)==="dismissed"; }
+  catch(e){ return false; }
+}
+
+function renderInstallTip(){
+  var el = document.getElementById("installTip");
+  var kind = installTipKind();
+  // Waits until the tour is done, so a first visit isn't two pop-ups at once.
+  if(!kind || installTipDismissed() || !tourSeen() || tourStep >= 0){ el.innerHTML = ""; return; }
+  var how = kind==="ios"
+    ? 'In Safari, tap the <b>Share</b> button, then <b>Add to Home Screen</b>.'
+    : (installPrompt ? '' : 'Tap the <b>\u22ee</b> menu, then <b>Add to Home screen</b> or <b>Install app</b>.');
+  el.innerHTML = '<div class="install-tip" role="note" aria-label="Add to home screen">'+
+    '<p><b>Put Playbook on your home screen</b></p>'+
+    (how ? '<p>'+how+'</p>' : '')+
+    '<small>It opens full screen like an app and works without Wi-Fi. The home screen app keeps its own plan, separate from this browser.</small>'+
+    (kind==="android" && installPrompt ? '<button type="button" class="btn" data-install>Install</button>' : '')+
+    '<button type="button" class="install-tip-close" data-install-dismiss aria-label="Hide this tip">\u00d7</button>'+
+    '</div>';
+}
+
+function dismissInstallTip(){
+  try{ localStorage.setItem(INSTALL_TIP_KEY, "dismissed"); }
+  catch(e){ /* storage unavailable \u2014 the tip may show again next visit */ }
+  renderInstallTip();
+}
+
+function setUpInstall(){
+  // Offline support needs a real web address; the test page's inline copy skips it.
+  if("serviceWorker" in navigator && /^https?:$/.test(location.protocol)){
+    navigator.serviceWorker.register("sw.js").catch(function(){ /* the app still works online without it */ });
+  }
+  window.addEventListener("beforeinstallprompt", function(ev){
+    ev.preventDefault();
+    installPrompt = ev;
+    renderInstallTip();
+  });
+  window.addEventListener("appinstalled", function(){ installPrompt = null; dismissInstallTip(); });
+  document.getElementById("installTip").addEventListener("click", function(ev){
+    if(ev.target.closest("[data-install-dismiss]")) dismissInstallTip();
+    if(ev.target.closest("[data-install]") && installPrompt){
+      installPrompt.prompt();
+      installPrompt = null;
+      renderInstallTip();
+    }
+  });
+  renderInstallTip();
 }
 
 document.addEventListener("keydown", function(ev){
