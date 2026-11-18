@@ -224,11 +224,28 @@ p.section-sub{margin:0 0 18px;color:var(--ink-soft);font-size:14px;font-weight:6
 .custom-actions .btn{font-size:16px;padding:5px 14px 3px;}
 .idea-select.is-picked{border-color:var(--turf);background:color-mix(in srgb, var(--turf) 14%, var(--surface));color:var(--turf-2);}
 /* "Mark done" sits on its own line under the ideas, so it is never mistaken for one of them. */
-.done-row{margin-top:8px;}
+.done-row{margin-top:8px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;}
+/* Edit and Remove for your own activity: plain text buttons so they don't compete with Mark done. */
+.custom-tools{display:inline-flex;gap:12px;}
+.custom-tools button{font:inherit;font-size:13px;font-weight:700;padding:6px 0;cursor:pointer;background:none;border:none;color:var(--navy);text-decoration:underline;}
+.custom-tools button[data-custom-remove]{color:var(--danger);}
 .done-btn{font:inherit;font-size:12.5px;font-weight:700;padding:4px 10px;cursor:pointer;
   background:transparent;color:var(--ink);border:1.5px dashed var(--ink-soft);}
 .done-btn.is-done{background:var(--turf);color:#fff;border:1.5px solid var(--turf-2);}
 .day-detail-row.free .swatch{border:1.5px dashed var(--ink-soft);}
+/* One-off changes for this week: a skipped commitment stays visible, crossed out. */
+.day-detail-row.skipped .what b{text-decoration:line-through;color:var(--ink-soft);}
+.day-detail-row.skipped .swatch{opacity:.35;}
+.week-change{margin-top:2px;font-size:12.5px;font-weight:700;color:var(--orange-2);}
+.change-tools{display:inline-flex;gap:12px;}
+.change-tools button{font:inherit;font-size:13px;font-weight:700;padding:4px 0;cursor:pointer;background:none;border:none;color:var(--navy);text-decoration:underline;}
+.change-form{margin-top:8px;padding:10px 12px;border:1.5px solid var(--line);background:var(--surface);max-width:320px;color:var(--ink);}
+.change-form p{margin:0 0 8px;font-size:13px;color:var(--ink-soft);}
+.change-times{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;}
+.change-times label{font-size:12.5px;font-weight:700;color:var(--ink-soft);}
+.change-times input{display:block;margin-top:2px;padding:5px 6px;font:inherit;font-size:14px;border:2px solid var(--ink);background:var(--surface);color:var(--ink);}
+.change-actions{display:flex;flex-wrap:wrap;gap:8px;}
+.change-actions .btn{font-size:16px;padding:5px 14px 3px;}
 .snap-day .d{font-family:var(--font-display);font-size:19px;letter-spacing:1px;color:var(--ink-soft);}
 .snap-day .bar-track{height:56px;display:flex;align-items:flex-end;justify-content:center;margin:6px 0;}
 .snap-day .bar{width:16px;background:var(--navy);}
@@ -918,6 +935,7 @@ var SEASON_KEY = STORAGE_PREFIX + "illini-playbook-season-v1";
 var TOUR_SEEN_KEY = STORAGE_PREFIX + "illini-playbook-tour-seen-v1";
 var MEAL_EATEN_KEY = STORAGE_PREFIX + "illini-playbook-meal-eaten-v1";
 var EXAMS_KEY = STORAGE_PREFIX + "illini-playbook-exams-v1";
+var WEEK_CHANGES_KEY = STORAGE_PREFIX + "illini-playbook-week-changes-v1";
 if (IS_TEST_COPY) {
   var testBanner = document.createElement("p");
   testBanner.className = "test-copy-banner";
@@ -959,7 +977,9 @@ var state = {
   customFormGap: null, // gap key whose "Something else" form is open, or null
   season: "in",        // "in" or "out" of season, for the NCAA hour limit
   mealEaten: {},       // eaten key (date + gap key + food) -> true
-  exams: []            // one-time exams and deadlines: {id, name, date:"2026-11-19", kind:"exam"|"due"}
+  exams: [],           // one-time exams and deadlines: {id, name, date:"2026-11-19", kind:"exam"|"due"}
+  weekChanges: {},     // change key (date + commitment id) -> {skip:true} or {start:"15:00", end:"17:30"}
+  changeFormFor: null  // "day|commitment id" whose "Change this week" form is open, or null
 };
 
 // A sample athlete week, shown on a first visit and by "Load the sample week".
@@ -1083,17 +1103,104 @@ function layoutDay(events){
 var DAY_START = 5*60, DAY_END = 23*60, PX_PER_MIN = 0.62;
 var GRID_HEIGHT = (DAY_END - DAY_START) * PX_PER_MIN;
 
-function expandByDay(){
+// Each day's commitments for this week (or weeksBack weeks ago), with that week's one-off changes:
+// skipped ones are left out, so their time becomes a gap, and moved ones use the new time.
+function expandByDay(weeksBack){
   var byDay = {}; DAYS.forEach(function(d){ byDay[d]=[]; });
   state.commitments.forEach(function(c){
     c.days.forEach(function(d){
       if(!byDay[d]) return;
-      byDay[d].push({
-        ref:c, startMin: toMin(c.start), endMin: toMin(c.end)
-      });
+      var change = state.weekChanges[weekChangeKey(d, c.id, weeksBack)];
+      if(change && change.skip) return;
+      var event = {ref:c, startMin: toMin(c.start), endMin: toMin(c.end)};
+      if(change && change.start){ event.startMin = toMin(change.start); event.endMin = toMin(change.end); event.moved = true; }
+      byDay[d].push(event);
     });
   });
   return byDay;
+}
+
+/* One-off changes: skip or move a weekly commitment for one date only. They are saved with that
+   date, so next week the commitment is back at its usual time on its own. */
+// Changes older than this are dropped on load; Recap only looks back one week.
+var WEEK_CHANGES_KEEP_WEEKS = 4;
+
+function weekChangeKey(day, id, weeksBack){ return dateOfThisWeek(day, weeksBack)+"|"+id; }
+
+function loadWeekChanges(){
+  var changes = loadPickMap(WEEK_CHANGES_KEY);
+  var oldest = dateOfThisWeek("Mon", WEEK_CHANGES_KEEP_WEEKS);
+  state.weekChanges = {};
+  Object.keys(changes).forEach(function(key){
+    if(key.split("|")[0] >= oldest) state.weekChanges[key] = changes[key];
+  });
+}
+function saveWeekChanges(){ savePickMap(WEEK_CHANGES_KEY, state.weekChanges); }
+
+function skippedOn(day){
+  return state.commitments.filter(function(c){
+    var change = state.weekChanges[weekChangeKey(day, c.id)];
+    return c.days.indexOf(day)>=0 && change && change.skip;
+  });
+}
+
+function findCommitment(id){ return state.commitments.filter(function(c){ return c.id===id; })[0] || null; }
+
+function openChangeForm(day, id){
+  var formKey = day+"|"+id;
+  state.changeFormFor = state.changeFormFor===formKey ? null : formKey;
+  renderSchedule();
+}
+
+function skipThisWeek(day, id){
+  state.weekChanges[weekChangeKey(day, id)] = {skip:true};
+  saveWeekChanges();
+  state.changeFormFor = null;
+  renderSchedule();
+}
+
+function undoWeekChange(day, id){
+  delete state.weekChanges[weekChangeKey(day, id)];
+  saveWeekChanges();
+  renderSchedule();
+}
+
+function saveChangedTime(form){
+  var day = form.dataset.changeDay, id = form.dataset.changeId;
+  var c = findCommitment(id);
+  var start = form.querySelector("[data-change-start]").value;
+  var end = form.querySelector("[data-change-end]").value;
+  var error = form.querySelector(".custom-error");
+  if(!c) return;
+  if(!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)){ error.textContent = "Enter a start and end time."; return; }
+  if(toMin(end) <= toMin(start)){ error.textContent = "The end time has to be after the start time."; return; }
+  var key = weekChangeKey(day, id);
+  // Moving it back to its usual time is the same as no change.
+  if(start===c.start && end===c.end) delete state.weekChanges[key];
+  else state.weekChanges[key] = {start:start, end:end};
+  saveWeekChanges();
+  state.changeFormFor = null;
+  renderSchedule();
+}
+
+function changeForm(day, event){
+  var c = event.ref;
+  return '<div class="change-form" data-change-day="'+day+'" data-change-id="'+escapeAttr(c.id)+'">'+
+    '<p>Only '+shortDate(dateOfThisWeek(day))+'. Next week stays the same.</p>'+
+    '<div class="change-actions" style="margin-bottom:10px"><button type="button" class="btn secondary" data-change-skip>Skip this week</button></div>'+
+    '<div class="change-times">'+
+      '<label>New start<input type="time" data-change-start value="'+minToHHMM(event.startMin)+'"></label>'+
+      '<label>New end<input type="time" data-change-end value="'+minToHHMM(event.endMin)+'"></label>'+
+    '</div>'+
+    '<p class="custom-error" role="alert"></p>'+
+    '<div class="change-actions"><button type="button" class="btn" data-change-save>Save new time</button>'+
+    '<button type="button" class="btn secondary" data-change-cancel>Cancel</button></div>'+
+    '</div>';
+}
+
+function minToHHMM(min){
+  var pad = function(n){ return (n<10?"0":"")+n; };
+  return pad(Math.floor(min/60))+":"+pad(min%60);
 }
 
 function renderSnapshot(byDay){
@@ -1406,6 +1513,18 @@ function saveCustomIdea(form){
   setActivityPick(key, name);
 }
 
+// Removing your own activity also clears it as the gap's pick and its Mark done check, so Recap stops counting it.
+function removeCustomIdea(key){
+  var custom = state.customIdeas[key];
+  if(!custom) return;
+  delete state.activityDone[doneKey(key.split("|")[0], key, custom.name)];
+  savePickMap(ACTIVITY_DONE_KEY, state.activityDone);
+  delete state.customIdeas[key];
+  savePickMap(CUSTOM_IDEAS_KEY, state.customIdeas);
+  if(state.activityPicks[key]===custom.name) setActivityPick(key, "");
+  else renderSchedule();
+}
+
 function customForm(key, gapMinutes){
   var current = state.customIdeas[key] || {name:"", minutes:"", group:"study"};
   return '<div class="custom-form" data-custom-gap="'+escapeAttr(key)+'" data-gap-minutes="'+gapMinutes+'">'+
@@ -1482,7 +1601,7 @@ function weekSummary(){
 var FOLLOW_GROUP_WORDS = {recover:"Recovery", study:"Study", rest:"Rest"};
 
 function followThrough(weeksBack){
-  var byDay = expandByDay();
+  var byDay = expandByDay(weeksBack);
   var lastDayIdx = weeksBack===0 ? (new Date().getDay()+6)%7 : DAYS.length-1;
   var doneKeys = Object.keys(state.activityDone);
   var eatenKeys = Object.keys(state.mealEaten);
@@ -1683,14 +1802,32 @@ function renderDayDetail(byDay){
   var events = byDay[day];
   var dateText = dateOfThisWeek(day);
   var soon = upcomingExam(dateText);
+  var skipped = skippedOn(day);
   var rows = events.map(function(e){
     var meta = TYPE_META[e.ref.type] || TYPE_META.other;
+    var idAttr = escapeAttr(e.ref.id);
+    var formOpen = state.changeFormFor===day+"|"+e.ref.id;
     return {start:e.startMin, html:'<div class="day-detail-row">'+
       '<div class="time">'+minToClock(e.startMin)+'\u2013'+minToClock(e.endMin)+'</div>'+
       '<div class="swatch '+meta.cls+'"></div>'+
-      '<div class="what"><b>'+escapeHtml(e.ref.title)+'</b><small>'+meta.label+(e.ref.loc?' \u00b7 '+escapeHtml(e.ref.loc):'')+'</small></div>'+
+      '<div class="what"><b>'+escapeHtml(e.ref.title)+'</b><small>'+meta.label+(e.ref.loc?' \u00b7 '+escapeHtml(e.ref.loc):'')+'</small>'+
+        (e.moved ? '<div class="week-change">Moved this week \u00b7 usually '+minToClock(toMin(e.ref.start))+'\u2013'+minToClock(toMin(e.ref.end))+'</div>' : '')+
+        '<span class="change-tools">'+
+          (formOpen ? '' : '<button type="button" data-change-open="'+idAttr+'" aria-label="Change '+escapeAttr(e.ref.title)+' this week">Change this week</button>')+
+          (e.moved ? '<button type="button" data-change-undo="'+idAttr+'">Undo</button>' : '')+
+        '</span>'+
+        (formOpen ? changeForm(day, e) : '')+
+      '</div>'+
       '</div>'};
-  }).concat(findGaps(events).map(function(g){
+  }).concat(skipped.map(function(c){
+    var meta = TYPE_META[c.type] || TYPE_META.other;
+    return {start:toMin(c.start), html:'<div class="day-detail-row skipped">'+
+      '<div class="time">'+minToClock(toMin(c.start))+'\u2013'+minToClock(toMin(c.end))+'</div>'+
+      '<div class="swatch '+meta.cls+'"></div>'+
+      '<div class="what"><b>'+escapeHtml(c.title)+'</b><div class="week-change">Skipped this week</div>'+
+        '<span class="change-tools"><button type="button" data-change-undo="'+escapeAttr(c.id)+'">Undo</button></span></div>'+
+      '</div>'};
+  })).concat(findGaps(events).map(function(g){
     var key = gapKey(day, g);
     var picked = state.activityPicks[key];
     // A study pick for an exam that's passed or removed no longer counts, so the gap shows as open.
@@ -1717,11 +1854,11 @@ function renderDayDetail(byDay){
           '<option value="'+CUSTOM_OPTION+'"'+(formOpen?' selected':'')+'>Something else\u2026</option>'+
         '</select>'+
         (formOpen ? customForm(key, g.end-g.start) : '')+
-        (picked && !formOpen ? doneButton(key, state.activityDone[doneKey(day, key, picked)]) : '')+
+        (picked && !formOpen ? doneButton(key, state.activityDone[doneKey(day, key, picked)], !!custom && custom.name===picked) : '')+
       '</div>'+
       '</div>'};
   })).sort(function(a,b){ return a.start-b.start; });
-  var body = events.length===0
+  var body = events.length===0 && skipped.length===0
     ? '<p class="empty-note">Free day \u2014 nothing scheduled.</p>'
     : rows.map(function(r){ return r.html; }).join("");
   el.innerHTML = '<div class="day-detail" role="region" aria-label="'+DAY_FULL[day]+' details">'+
@@ -1782,13 +1919,19 @@ function mealLine(key, meal, isEaten){
     (isEaten ? '\u2713 Eaten' : 'Mark eaten')+'</button></div>';
 }
 
-function doneButton(key, isDone){
+// isCustom adds Edit and Remove, for when the pick is the user's own activity.
+function doneButton(key, isDone, isCustom){
   return '<div class="done-row"><button type="button" class="done-btn'+(isDone?' is-done':'')+'" data-done-gap="'+escapeAttr(key)+'" aria-pressed="'+!!isDone+'">'+
-    (isDone ? '\u2713 Done' : 'Mark done')+'</button></div>';
+    (isDone ? '\u2713 Done' : 'Mark done')+'</button>'+
+    (isCustom ? '<span class="custom-tools">'+
+      '<button type="button" data-custom-edit="'+escapeAttr(key)+'">Edit</button>'+
+      '<button type="button" data-custom-remove="'+escapeAttr(key)+'">Remove</button></span>' : '')+
+    '</div>';
 }
 
 function toggleDay(day){
   state.selectedDay = state.selectedDay===day ? null : day;
+  state.changeFormFor = null;
   renderSchedule();
 }
 
@@ -1970,10 +2113,10 @@ function renderStartFresh(){
 function startFresh(){
   state.commitments = [];
   state.mealPicks = {}; state.activityPicks = {}; state.activityDone = {};
-  state.customIdeas = {}; state.mealEaten = {}; state.exams = [];
+  state.customIdeas = {}; state.mealEaten = {}; state.exams = []; state.weekChanges = {}; state.changeFormFor = null;
   state.expandedGaps = {}; state.selectedDay = null; state.customFormGap = null;
   saveCommitments();
-  [PICKS_KEY, ACTIVITY_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY, MEAL_EATEN_KEY].forEach(function(key){ savePickMap(key, {}); });
+  [PICKS_KEY, ACTIVITY_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY, MEAL_EATEN_KEY, WEEK_CHANGES_KEY].forEach(function(key){ savePickMap(key, {}); });
   saveExams();
   startFreshConfirming = false;
   startFreshMessage = {text:"Cleared.", count:0};
@@ -2514,6 +2657,7 @@ function init(){
   loadSeason();
   loadMealEaten();
   loadExams();
+  loadWeekChanges();
   buildDayPick();
   buildHallFilterOptions();
   renderSchedule();
@@ -2565,6 +2709,18 @@ function init(){
     if(doneBtn) toggleActivityDone(doneBtn.dataset.doneGap);
     if(ev.target.closest("[data-custom-save]")) saveCustomIdea(ev.target.closest(".custom-form"));
     if(ev.target.closest("[data-custom-cancel]")){ state.customFormGap = null; renderSchedule(); }
+    var editBtn = ev.target.closest("[data-custom-edit]");
+    if(editBtn) openCustomForm(editBtn.dataset.customEdit);
+    var removeBtn = ev.target.closest("[data-custom-remove]");
+    if(removeBtn) removeCustomIdea(removeBtn.dataset.customRemove);
+    var changeOpenBtn = ev.target.closest("[data-change-open]");
+    if(changeOpenBtn) openChangeForm(state.selectedDay, changeOpenBtn.dataset.changeOpen);
+    var changeUndoBtn = ev.target.closest("[data-change-undo]");
+    if(changeUndoBtn) undoWeekChange(state.selectedDay, changeUndoBtn.dataset.changeUndo);
+    var changeFormEl = ev.target.closest(".change-form");
+    if(changeFormEl && ev.target.closest("[data-change-skip]")) skipThisWeek(changeFormEl.dataset.changeDay, changeFormEl.dataset.changeId);
+    if(changeFormEl && ev.target.closest("[data-change-save]")) saveChangedTime(changeFormEl);
+    if(ev.target.closest("[data-change-cancel]")){ state.changeFormFor = null; renderSchedule(); }
   });
   // Enter in the custom form saves it.
   document.getElementById("dayDetail").addEventListener("keydown", function(ev){
