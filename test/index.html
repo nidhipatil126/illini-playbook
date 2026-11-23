@@ -241,6 +241,11 @@ p.section-sub{margin:0 0 18px;color:var(--ink-soft);font-size:14px;font-weight:6
 .idea-select.is-picked{border-color:var(--turf);background:color-mix(in srgb, var(--turf) 14%, var(--surface));color:var(--turf-2);}
 /* "Mark done" sits on its own line under the ideas, so it is never mistaken for one of them. */
 .done-row{margin-top:8px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;}
+/* Every week / Just this week switch for a gap's pick. */
+.repeat-switch{display:inline-flex;border:1.5px solid var(--ink);}
+.repeat-switch button{font:inherit;font-size:12.5px;font-weight:700;padding:4px 9px;white-space:nowrap;cursor:pointer;background:var(--surface);color:var(--ink);border:none;}
+.repeat-switch button + button{border-left:1.5px solid var(--ink);}
+.repeat-switch button[aria-pressed="true"]{background:var(--navy);color:#fff;}
 /* Edit and Remove for your own activity: plain text buttons so they don't compete with Mark done. */
 .custom-tools{display:inline-flex;gap:12px;}
 .custom-tools button{font:inherit;font-size:13px;font-weight:700;padding:6px 0;cursor:pointer;background:none;border:none;color:var(--navy);text-decoration:underline;}
@@ -966,6 +971,7 @@ var EXAMS_KEY = STORAGE_PREFIX + "illini-playbook-exams-v1";
 var INSTALL_TIP_KEY = STORAGE_PREFIX + "illini-playbook-install-tip-v1";
 var WEEK_CHANGES_KEY = STORAGE_PREFIX + "illini-playbook-week-changes-v1";
 var ONE_TIME_KEY = STORAGE_PREFIX + "illini-playbook-one-time-v1";
+var WEEK_PICKS_KEY = STORAGE_PREFIX + "illini-playbook-week-picks-v1";
 if (IS_TEST_COPY) {
   var testBanner = document.createElement("p");
   testBanner.className = "test-copy-banner";
@@ -1001,7 +1007,8 @@ var state = {
   mealPicks: {},      // gap key ("Mon|300-360") -> picked food name
   expandedGaps: {},   // gap key -> true while "Show all options" is on
   selectedDay: null,  // day whose details are open on the Schedule tab, or null
-  activityPicks: {},  // gap key -> picked idea name (separate from the meal pick)
+  activityPicks: {},  // gap key -> picked idea name that repeats every week (separate from the meal pick)
+  weekPicks: {},      // date + gap key -> picked idea name for that one week; wins over the weekly pick
   activityDone: {},   // done key (date + gap key + idea) -> true
   customIdeas: {},    // gap key -> {name, minutes, group} the user typed in for that gap
   customFormGap: null, // gap key whose "Something else" form is open, or null
@@ -1576,8 +1583,50 @@ function loadCustomIdeas(){
 }
 
 // The idea picked for a gap, from the starter list, the user's own, or studying for an exam; null if none.
+// A gap's pick for this week (or weeksBack weeks ago): that week's own pick if there is one,
+// otherwise the pick that repeats every week.
+function weekPickKey(key, weeksBack){ return dateOfThisWeek(key.split("|")[0], weeksBack)+"|"+key; }
+function pickValue(key, weeksBack){
+  return state.weekPicks[weekPickKey(key, weeksBack)] || state.activityPicks[key] || "";
+}
+function isThisWeekPick(key){ return !!state.weekPicks[weekPickKey(key)]; }
+
+function loadWeekPicks(){
+  var picks = loadPickMap(WEEK_PICKS_KEY);
+  var oldest = dateOfThisWeek("Mon", WEEK_CHANGES_KEEP_WEEKS);
+  state.weekPicks = {};
+  Object.keys(picks).forEach(function(k){ if(k.split("|")[0] >= oldest && typeof picks[k]==="string") state.weekPicks[k] = picks[k]; });
+}
+function saveAllPicks(){
+  savePickMap(ACTIVITY_PICKS_KEY, state.activityPicks);
+  savePickMap(WEEK_PICKS_KEY, state.weekPicks);
+}
+
+// Every week: the pick repeats (replacing any older weekly pick). Just this week: it stops repeating.
+function setPickRepeat(key, everyWeek){
+  var value = pickValue(key);
+  if(!value) return;
+  if(everyWeek){
+    state.activityPicks[key] = value;
+    delete state.weekPicks[weekPickKey(key)];
+  } else {
+    state.weekPicks[weekPickKey(key)] = value;
+    if(state.activityPicks[key]===value) delete state.activityPicks[key];
+  }
+  saveAllPicks();
+  renderSchedule();
+}
+
+function repeatSwitch(key){
+  var thisWeek = isThisWeekPick(key);
+  return '<span class="repeat-switch" role="group" aria-label="How often">'+
+    '<button type="button" data-repeat-gap="'+escapeAttr(key)+'" data-repeat="week" aria-pressed="'+thisWeek+'">Just this week</button>'+
+    '<button type="button" data-repeat-gap="'+escapeAttr(key)+'" data-repeat="every" aria-pressed="'+!thisWeek+'">Every week</button>'+
+    '</span>';
+}
+
 function pickedIdeaFor(key, weeksBack){
-  var name = state.activityPicks[key];
+  var name = pickValue(key, weeksBack);
   if(!name) return null;
   if(name.indexOf(EXAM_STUDY_PREFIX)===0) return examStudyIdea(key, name.slice(EXAM_STUDY_PREFIX.length), weeksBack);
   var custom = state.customIdeas[key];
@@ -1602,6 +1651,9 @@ function saveCustomIdea(form){
   if(!name){ error.textContent = "Add what you'll do."; return; }
   if(!Number.isInteger(minutes) || minutes < MIN_CUSTOM_MINUTES){ error.textContent = "Enter how many minutes (at least "+MIN_CUSTOM_MINUTES+")."; return; }
   if(minutes > gapMinutes){ error.textContent = "This gap is only "+lengthText(gapMinutes)+". Enter "+gapMinutes+" minutes or less."; return; }
+  // Renaming your own activity keeps it repeating if it already did.
+  var old = state.customIdeas[key];
+  if(old && state.activityPicks[key]===old.name) state.activityPicks[key] = name;
   state.customIdeas[key] = {name:name, minutes:minutes, group: groupInput ? groupInput.value : "study"};
   savePickMap(CUSTOM_IDEAS_KEY, state.customIdeas);
   state.customFormGap = null;
@@ -1616,8 +1668,10 @@ function removeCustomIdea(key){
   savePickMap(ACTIVITY_DONE_KEY, state.activityDone);
   delete state.customIdeas[key];
   savePickMap(CUSTOM_IDEAS_KEY, state.customIdeas);
-  if(state.activityPicks[key]===custom.name) setActivityPick(key, "");
-  else renderSchedule();
+  if(state.activityPicks[key]===custom.name) delete state.activityPicks[key];
+  if(state.weekPicks[weekPickKey(key)]===custom.name) delete state.weekPicks[weekPickKey(key)];
+  saveAllPicks();
+  renderSchedule();
 }
 
 function customForm(key, gapMinutes){
@@ -1647,7 +1701,7 @@ function toggleMealEaten(key){
 
 function toggleActivityDone(key){
   var day = key.split("|")[0];
-  var done = doneKey(day, key, state.activityPicks[key]);
+  var done = doneKey(day, key, pickValue(key));
   if(state.activityDone[done]) delete state.activityDone[done];
   else state.activityDone[done] = true;
   savePickMap(ACTIVITY_DONE_KEY, state.activityDone);
@@ -1655,10 +1709,19 @@ function toggleActivityDone(key){
 }
 
 // An empty idea (the "Pick something to do…" line) clears the gap's pick.
+// A new pick is for just this week; the Every week switch makes it repeat. Choosing the weekly
+// pick again just drops this week's own pick. Clearing removes this week's pick first, then the weekly one.
 function setActivityPick(key, idea){
-  if(idea) state.activityPicks[key] = idea;
-  else delete state.activityPicks[key];
-  savePickMap(ACTIVITY_PICKS_KEY, state.activityPicks);
+  var weekKey = weekPickKey(key);
+  if(!idea){
+    if(state.weekPicks[weekKey]) delete state.weekPicks[weekKey];
+    else delete state.activityPicks[key];
+  } else if(idea===state.activityPicks[key]){
+    delete state.weekPicks[weekKey];
+  } else {
+    state.weekPicks[weekKey] = idea;
+  }
+  saveAllPicks();
   renderSchedule();
 }
 
@@ -1677,7 +1740,7 @@ function weekSummary(){
     events.forEach(function(e){ day.busyMin += e.endMin-e.startMin; });
     gaps.forEach(function(g){
       var key = gapKey(d, g);
-      var ideaName = state.activityPicks[key];
+      var ideaName = pickValue(key);
       var idea = pickedIdeaFor(key);
       day.freeMin += g.end-g.start;
       if(idea){ groupMinutes[idea.group] += idea.minutes; if(idea.group==="recover") day.recover++; }
@@ -1926,7 +1989,7 @@ function renderDayDetail(byDay){
       '</div>'};
   })).concat(findGaps(events).map(function(g){
     var key = gapKey(day, g);
-    var picked = state.activityPicks[key];
+    var picked = pickValue(key);
     // A study pick for an exam that's passed or removed no longer counts, so the gap shows as open.
     if(picked && picked.indexOf(EXAM_STUDY_PREFIX)===0 && !pickedIdeaFor(key)) picked = null;
     var ideas = ideasFor(g.end-g.start, classifyGap(g, events).kind);
@@ -2023,6 +2086,7 @@ function mealLine(key, meal, isEaten){
 function doneButton(key, isDone, isCustom){
   return '<div class="done-row"><button type="button" class="done-btn'+(isDone?' is-done':'')+'" data-done-gap="'+escapeAttr(key)+'" aria-pressed="'+!!isDone+'">'+
     (isDone ? '\u2713 Done' : 'Mark done')+'</button>'+
+    repeatSwitch(key)+
     (isCustom ? '<span class="custom-tools">'+
       '<button type="button" data-custom-edit="'+escapeAttr(key)+'">Edit</button>'+
       '<button type="button" data-custom-remove="'+escapeAttr(key)+'">Remove</button></span>' : '')+
@@ -2213,12 +2277,12 @@ function renderStartFresh(){
 
 function startFresh(){
   state.commitments = [];
-  state.mealPicks = {}; state.activityPicks = {}; state.activityDone = {};
+  state.mealPicks = {}; state.activityPicks = {}; state.weekPicks = {}; state.activityDone = {};
   state.customIdeas = {}; state.mealEaten = {}; state.exams = []; state.weekChanges = {}; state.changeFormFor = null;
   state.oneTimeEvents = []; state.oneTimeFormOpen = false;
   state.expandedGaps = {}; state.selectedDay = null; state.customFormGap = null;
   saveCommitments();
-  [PICKS_KEY, ACTIVITY_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY, MEAL_EATEN_KEY, WEEK_CHANGES_KEY].forEach(function(key){ savePickMap(key, {}); });
+  [PICKS_KEY, ACTIVITY_PICKS_KEY, WEEK_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY, MEAL_EATEN_KEY, WEEK_CHANGES_KEY].forEach(function(key){ savePickMap(key, {}); });
   saveExams();
   saveOneTimeEvents();
   startFreshConfirming = false;
@@ -2235,7 +2299,7 @@ var MAX_PLAN_TEXT = 500000;
 // Saved without the test copy's prefix, so a plan moves between the test and main copies too.
 function planStorageKeys(){
   return [STORAGE_KEY, PROFILE_KEY, PICKS_KEY, ACTIVITY_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY,
-    SEASON_KEY, MEAL_EATEN_KEY, EXAMS_KEY, WEEK_CHANGES_KEY, ONE_TIME_KEY];
+    SEASON_KEY, MEAL_EATEN_KEY, EXAMS_KEY, WEEK_CHANGES_KEY, ONE_TIME_KEY, WEEK_PICKS_KEY];
 }
 function planKeyName(storageKey){ return storageKey.slice(STORAGE_PREFIX.length); }
 
@@ -2880,6 +2944,7 @@ function loadSavedPlan(){
   loadProfile();
   loadMealPicks();
   loadActivityPicks();
+  loadWeekPicks();
   loadActivityDone();
   loadCustomIdeas();
   loadSeason();
@@ -2941,6 +3006,8 @@ function init(){
     if(eatenBtn) toggleMealEaten(eatenBtn.dataset.eatenGap);
     var doneBtn = ev.target.closest("[data-done-gap]");
     if(doneBtn) toggleActivityDone(doneBtn.dataset.doneGap);
+    var repeatBtn = ev.target.closest("[data-repeat-gap]");
+    if(repeatBtn) setPickRepeat(repeatBtn.dataset.repeatGap, repeatBtn.dataset.repeat==="every");
     if(ev.target.closest("[data-custom-save]")) saveCustomIdea(ev.target.closest(".custom-form"));
     if(ev.target.closest("[data-custom-cancel]")){ state.customFormGap = null; renderSchedule(); }
     var editBtn = ev.target.closest("[data-custom-edit]");
