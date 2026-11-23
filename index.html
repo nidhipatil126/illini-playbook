@@ -854,7 +854,7 @@ footer.foot{
   <!-- ============ RECAP TAB ============ -->
   <section class="tab" id="tab-recap">
     <h2 class="section-title">Week recap</h2>
-    <p class="section-sub">Your week repeats, so this is last week and next week as planned. Picks come from the day panel on Schedule and from Fuel.</p>
+    <p class="section-sub">This week so far: your plans, check-ins and hours, plus how last week went. Picks come from the day panel on Schedule and from Fuel.</p>
     <div class="recap-stats" id="recapStats"></div>
     <h3 class="recap-heading">NCAA hours</h3>
     <div id="recapHours"></div>
@@ -2792,6 +2792,9 @@ function mealPeriodFor(min){
   return "lunch";
 }
 
+// A gap's meal goes by its middle, so a 4-11 PM gap is dinner, not lunch.
+function gapMealPeriod(gap){ return mealPeriodFor(Math.floor((gap.start+gap.end)/2)); }
+
 function findGaps(dayEvents){
   var sorted = dayEvents.slice().sort(function(a,b){ return a.startMin-b.startMin; });
   var gaps = [];
@@ -2822,7 +2825,7 @@ function classifyGap(gap, dayEvents){
   if(prevPractice && gap.start - prevPractice.endMin <= RECOVERY_WINDOW_MIN){
     return {kind:"rec", label:"Recovery", tag:"recovery"};
   }
-  return {kind:"meal", label: capitalize(mealPeriodFor(gap.start)), tag:null};
+  return {kind:"meal", label: capitalize(gapMealPeriod(gap)), tag:null};
 }
 function capitalize(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
 
@@ -2875,7 +2878,7 @@ function suggestFor(gap, classification, goal){
 
 // Every food for this gap's meal, best match first (the top few are the suggestions).
 function rankedFoodsFor(gap, classification, goal){
-  var meal = mealPeriodFor(gap.start);
+  var meal = gapMealPeriod(gap);
   var pool = allDiningItems().filter(function(it){ return it.meal===meal; });
 
   if(classification.tag){
@@ -3182,7 +3185,7 @@ function renderInfo(){
   document.getElementById("info-gap-types").innerHTML = [
     "<b>Pre-practice:</b> practice, lift or game within "+(PRE_PRACTICE_WINDOW_MIN/60)+" hours after. Favors carb-heavy, easy-to-digest foods.",
     "<b>Recovery:</b> practice, lift or game ended within "+RECOVERY_WINDOW_MIN+" minutes before. Favors protein plus carbs.",
-    "<b>Meal:</b> otherwise, breakfast before "+minToClock(BREAKFAST_ENDS_MIN)+", lunch until "+minToClock(DINNER_STARTS_MIN)+", then dinner."
+    "<b>Meal:</b> otherwise, by the middle of the gap: breakfast before "+minToClock(BREAKFAST_ENDS_MIN)+", lunch until "+minToClock(DINNER_STARTS_MIN)+", then dinner."
   ].map(function(s){ return "<li>"+s+"</li>"; }).join("");
 }
 
