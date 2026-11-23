@@ -205,6 +205,7 @@ p.section-sub{margin:0 0 18px;color:var(--ink-soft);font-size:14px;font-weight:6
 .sleep-form label{font-size:12.5px;font-weight:700;color:var(--ink-soft);}
 .sleep-form select{display:block;margin-top:2px;padding:5px 6px;font:inherit;font-size:14px;border:2px solid var(--ink);background:var(--surface);color:var(--ink);}
 .sleep-form .btn{font-size:16px;padding:5px 14px 3px;}
+.slump-note{margin-top:2px;font-size:12.5px;font-weight:700;color:var(--orange-2);font-style:normal;}
 .day-wake{margin:0 0 10px;font-size:14px;font-weight:700;color:var(--navy);}
 .day-wake small{font-weight:400;color:var(--ink-soft);}
 .next-up h3{margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-soft);}
@@ -1361,7 +1362,11 @@ var ACTIVITY_IDEAS = [
   {name:"Career fair prep", minutes:90, group:"study"},
   {name:"Quiet time, phone away", minutes:15, group:"rest"},
   {name:"20-min nap (set a timer)", minutes:20, group:"rest", when:"notAfter"},
-  {name:"Music or podcast break", minutes:20, group:"rest"}
+  {name:"Music or podcast break", minutes:20, group:"rest"},
+  // Pick-me-ups only offered in the afternoon energy dip (see slumpIdeas).
+  {name:"10-minute walk outside", minutes:10, group:"rest", when:"slump"},
+  {name:"Snack: fruit + protein", minutes:10, group:"recover", when:"slump"},
+  {name:"Cold water + stretch", minutes:5, group:"recover", when:"slump"}
 ];
 var IDEA_GROUPS = ["recover", "study", "rest"];
 var IDEA_GROUP_NAMES = {recover:"Recover", study:"Study", rest:"Rest"};
@@ -1377,6 +1382,21 @@ function ideasFor(gapMinutes, gapKind){
       return true;
     }).sort(function(a,b){ return (b.when==="after")-(a.when==="after") || b.minutes-a.minutes; })[0];
   }).filter(Boolean);
+}
+
+/* Afternoon energy dip: a gap that overlaps 1-4 PM lists pick-me-ups first. */
+var SLUMP_FROM_MIN = 13*60, SLUMP_TO_MIN = 16*60;
+var SLUMP_NAP = "20-min nap (set a timer)";
+
+function isSlumpGap(gap){ return gap.start < SLUMP_TO_MIN && gap.end > SLUMP_FROM_MIN; }
+
+// The nap is left out right after training, like everywhere else.
+function slumpIdeas(gapMinutes, gapKind){
+  return ACTIVITY_IDEAS.filter(function(idea){
+    if(idea.minutes > gapMinutes) return false;
+    if(idea.name===SLUMP_NAP) return gapKind!=="rec";
+    return idea.when==="slump";
+  });
 }
 
 function lengthText(mins){
@@ -2004,6 +2024,12 @@ function renderDayDetail(byDay){
     // A study pick for an exam that's passed or removed no longer counts, so the gap shows as open.
     if(picked && picked.indexOf(EXAM_STUDY_PREFIX)===0 && !pickedIdeaFor(key)) picked = null;
     var ideas = ideasFor(g.end-g.start, classifyGap(g, events).kind);
+    var slump = isSlumpGap(g);
+    if(slump){
+      var pickMeUps = slumpIdeas(g.end-g.start, classifyGap(g, events).kind);
+      ideas = pickMeUps.concat(ideas.filter(function(i){ return pickMeUps.indexOf(i)<0; }));
+    }
+    // Before an exam, studying still comes first, even in the energy dip.
     if(soon) ideas = examsInWindow(dateText).map(function(x){ return examStudyIdea(key, x.exam.id); }).concat(studyFirst(ideas));
     var custom = state.customIdeas[key];
     if(custom && !ideas.some(function(i){ return i.name===custom.name; })) ideas.push(custom);
@@ -2015,6 +2041,7 @@ function renderDayDetail(byDay){
       '<div class="time">'+minToClock(g.start)+'\u2013'+minToClock(g.end)+'</div>'+
       '<div class="swatch"></div>'+
       '<div class="what">Free \u00b7 '+lengthText(g.end-g.start)+' <small>'+classifyGap(g, events).label+' window</small>'+
+        (slump ? '<div class="slump-note">Energy dip \u2014 pick-me-ups first</div>' : '')+
         (meal ? mealLine(key, meal, state.mealEaten[doneKey(day, key, meal)]) : '')+
         '<select class="idea-select'+(picked?' is-picked':'')+'" data-idea-gap="'+escapeAttr(key)+'" aria-label="Something to do '+minToClock(g.start)+' to '+minToClock(g.end)+'">'+
           '<option value="">Pick something to do\u2026</option>'+
