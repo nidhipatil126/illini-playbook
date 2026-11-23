@@ -261,6 +261,12 @@ p.section-sub{margin:0 0 18px;color:var(--ink-soft);font-size:14px;font-weight:6
 .change-times label{font-size:12.5px;font-weight:700;color:var(--ink-soft);}
 .change-times input{display:block;margin-top:2px;padding:5px 6px;font:inherit;font-size:14px;border:2px solid var(--ink);background:var(--surface);color:var(--ink);}
 .change-actions{display:flex;flex-wrap:wrap;gap:8px;}
+.one-time-tag{display:inline-block;margin-left:6px;padding:0 6px;font-size:11px;font-weight:800;letter-spacing:.4px;
+  text-transform:uppercase;vertical-align:2px;border:1.5px solid var(--navy);color:var(--navy);}
+.one-time-add{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
+.one-time-form label.full{display:block;margin-bottom:8px;font-size:12.5px;font-weight:700;color:var(--ink-soft);}
+.one-time-form label.full input,.one-time-form label.full select{display:block;width:100%;margin-top:2px;padding:6px 8px;font:inherit;font-size:14px;
+  border:2px solid var(--ink);background:var(--surface);color:var(--ink);box-sizing:border-box;}
 .change-actions .btn{font-size:16px;padding:5px 14px 3px;}
 .snap-day .d{font-family:var(--font-display);font-size:19px;letter-spacing:1px;color:var(--ink-soft);}
 .snap-day .bar-track{height:56px;display:flex;align-items:flex-end;justify-content:center;margin:6px 0;}
@@ -959,6 +965,7 @@ var MEAL_EATEN_KEY = STORAGE_PREFIX + "illini-playbook-meal-eaten-v1";
 var EXAMS_KEY = STORAGE_PREFIX + "illini-playbook-exams-v1";
 var INSTALL_TIP_KEY = STORAGE_PREFIX + "illini-playbook-install-tip-v1";
 var WEEK_CHANGES_KEY = STORAGE_PREFIX + "illini-playbook-week-changes-v1";
+var ONE_TIME_KEY = STORAGE_PREFIX + "illini-playbook-one-time-v1";
 if (IS_TEST_COPY) {
   var testBanner = document.createElement("p");
   testBanner.className = "test-copy-banner";
@@ -1002,7 +1009,9 @@ var state = {
   mealEaten: {},       // eaten key (date + gap key + food) -> true
   exams: [],           // one-time exams and deadlines: {id, name, date:"2026-11-19", kind:"exam"|"due"}
   weekChanges: {},     // change key (date + commitment id) -> {skip:true} or {start:"15:00", end:"17:30"}
-  changeFormFor: null  // "day|commitment id" whose "Change this week" form is open, or null
+  changeFormFor: null, // "day|commitment id" whose "Change this week" form is open, or null
+  oneTimeEvents: [],   // this week's one-time events: {id, title, type, date:"2026-11-26", start, end}
+  oneTimeFormOpen: false // whether the open day's "Add one-time event" form is showing
 };
 
 // A sample athlete week, shown on a first visit and by "Load the sample week".
@@ -1140,7 +1149,69 @@ function expandByDay(weeksBack){
       byDay[d].push(event);
     });
   });
+  state.oneTimeEvents.forEach(function(x){
+    DAYS.forEach(function(d){
+      if(dateOfThisWeek(d, weeksBack)===x.date) byDay[d].push({ref:x, startMin:toMin(x.start), endMin:toMin(x.end), oneTime:true});
+    });
+  });
   return byDay;
+}
+
+/* One-time events: something that happens once this week (a team meeting, a doctor's visit),
+   added from the open day. They are dropped once their week is over. */
+var MAX_ONE_TIME_TITLE = 60;
+
+function loadOneTimeEvents(){
+  var saved;
+  try{ saved = JSON.parse(localStorage.getItem(ONE_TIME_KEY)); }
+  catch(e){ saved = null; /* unreadable \u2014 start with none */ }
+  // Kept a week longer than shown, so Recap's last-week look still has them.
+  var oldest = dateOfThisWeek("Mon", 1);
+  state.oneTimeEvents = Array.isArray(saved) ? saved.filter(function(x){
+    return x && typeof x.id==="string" && typeof x.title==="string" && x.title && TYPE_META[x.type] &&
+      isDateText(x.date) && x.date >= oldest && /^\d{2}:\d{2}$/.test(x.start) && /^\d{2}:\d{2}$/.test(x.end) && toMin(x.end) > toMin(x.start);
+  }) : [];
+}
+function saveOneTimeEvents(){
+  try{ localStorage.setItem(ONE_TIME_KEY, JSON.stringify(state.oneTimeEvents)); }
+  catch(e){ /* storage unavailable \u2014 events still hold for this session */ }
+}
+
+function oneTimeForm(){
+  return '<div class="change-form one-time-form">'+
+    '<label class="full">What is it?<input type="text" data-one-time-title maxlength="'+MAX_ONE_TIME_TITLE+'" placeholder="Tutoring, team meeting"></label>'+
+    '<label class="full">Type<select data-one-time-type>'+Object.keys(TYPE_META).map(function(type){
+      return '<option value="'+type+'"'+(type==="other"?' selected':'')+'>'+TYPE_META[type].label+'</option>';
+    }).join("")+'</select></label>'+
+    '<div class="change-times">'+
+      '<label>Start<input type="time" data-one-time-start></label>'+
+      '<label>End<input type="time" data-one-time-end></label>'+
+    '</div>'+
+    '<p class="custom-error" role="alert"></p>'+
+    '<div class="change-actions"><button type="button" class="btn" data-one-time-save>Add</button>'+
+    '<button type="button" class="btn secondary" data-one-time-cancel>Cancel</button></div>'+
+    '</div>';
+}
+
+function saveOneTimeEvent(form, day){
+  var title = form.querySelector("[data-one-time-title]").value.trim().slice(0, MAX_ONE_TIME_TITLE);
+  var type = form.querySelector("[data-one-time-type]").value;
+  var start = form.querySelector("[data-one-time-start]").value;
+  var end = form.querySelector("[data-one-time-end]").value;
+  var error = form.querySelector(".custom-error");
+  if(!title){ error.textContent = "Add what it is."; return; }
+  if(!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)){ error.textContent = "Enter a start and end time."; return; }
+  if(toMin(end) <= toMin(start)){ error.textContent = "The end time has to be after the start time."; return; }
+  state.oneTimeEvents.push({id:uid(), title:title, type: TYPE_META[type] ? type : "other", date:dateOfThisWeek(day), start:start, end:end, loc:""});
+  saveOneTimeEvents();
+  state.oneTimeFormOpen = false;
+  renderSchedule();
+}
+
+function removeOneTimeEvent(id){
+  state.oneTimeEvents = state.oneTimeEvents.filter(function(x){ return x.id!==id; });
+  saveOneTimeEvents();
+  renderSchedule();
 }
 
 /* One-off changes: skip or move a weekly commitment for one date only. They are saved with that
@@ -1834,12 +1905,14 @@ function renderDayDetail(byDay){
     return {start:e.startMin, html:'<div class="day-detail-row">'+
       '<div class="time">'+minToClock(e.startMin)+'\u2013'+minToClock(e.endMin)+'</div>'+
       '<div class="swatch '+meta.cls+'"></div>'+
-      '<div class="what"><b>'+escapeHtml(e.ref.title)+'</b><small>'+meta.label+(e.ref.loc?' \u00b7 '+escapeHtml(e.ref.loc):'')+'</small>'+
+      '<div class="what"><b>'+escapeHtml(e.ref.title)+'</b>'+(e.oneTime ? '<span class="one-time-tag">One time</span>' : '')+'<small>'+meta.label+(e.ref.loc?' \u00b7 '+escapeHtml(e.ref.loc):'')+'</small>'+
         (e.moved ? '<div class="week-change">Moved this week \u00b7 usually '+minToClock(toMin(e.ref.start))+'\u2013'+minToClock(toMin(e.ref.end))+'</div>' : '')+
-        '<span class="change-tools">'+
-          (formOpen ? '' : '<button type="button" data-change-open="'+idAttr+'" aria-label="Change '+escapeAttr(e.ref.title)+' this week">Change this week</button>')+
-          (e.moved ? '<button type="button" data-change-undo="'+idAttr+'">Undo</button>' : '')+
-        '</span>'+
+        (e.oneTime
+          ? '<span class="change-tools"><button type="button" data-one-time-remove="'+idAttr+'" aria-label="Remove '+escapeAttr(e.ref.title)+'">Remove</button></span>'
+          : '<span class="change-tools">'+
+            (formOpen ? '' : '<button type="button" data-change-open="'+idAttr+'" aria-label="Change '+escapeAttr(e.ref.title)+' this week">Change this week</button>')+
+            (e.moved ? '<button type="button" data-change-undo="'+idAttr+'">Undo</button>' : '')+
+          '</span>')+
         (formOpen ? changeForm(day, e) : '')+
       '</div>'+
       '</div>'};
@@ -1891,7 +1964,10 @@ function renderDayDetail(byDay){
     examLines(examsOn(dateText))+
     (soon ? '<p class="study-first-note">'+escapeHtml(soon.exam.name)+' '+
       (soon.days===0 ? 'is today' : 'in '+soon.days+' day'+(soon.days>1?'s':''))+' \u2014 Study ideas are listed first.</p>' : '')+
-    gameFuelCard(events)+body+'</div>';
+    gameFuelCard(events)+body+
+    '<div class="one-time-add">'+(state.oneTimeFormOpen ? oneTimeForm()
+      : '<button type="button" class="btn secondary" data-one-time-open>+ Add one-time event</button>')+'</div>'+
+    '</div>';
 }
 
 // Game-day fuel: a full meal 3-4 hours before the first game of the day,
@@ -1956,6 +2032,7 @@ function doneButton(key, isDone, isCustom){
 function toggleDay(day){
   state.selectedDay = state.selectedDay===day ? null : day;
   state.changeFormFor = null;
+  state.oneTimeFormOpen = false;
   renderSchedule();
 }
 
@@ -2138,10 +2215,12 @@ function startFresh(){
   state.commitments = [];
   state.mealPicks = {}; state.activityPicks = {}; state.activityDone = {};
   state.customIdeas = {}; state.mealEaten = {}; state.exams = []; state.weekChanges = {}; state.changeFormFor = null;
+  state.oneTimeEvents = []; state.oneTimeFormOpen = false;
   state.expandedGaps = {}; state.selectedDay = null; state.customFormGap = null;
   saveCommitments();
   [PICKS_KEY, ACTIVITY_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY, MEAL_EATEN_KEY, WEEK_CHANGES_KEY].forEach(function(key){ savePickMap(key, {}); });
   saveExams();
+  saveOneTimeEvents();
   startFreshConfirming = false;
   startFreshMessage = {text:"Cleared.", count:0};
   renderCommitList(); renderExamList(); renderSchedule();
@@ -2156,7 +2235,7 @@ var MAX_PLAN_TEXT = 500000;
 // Saved without the test copy's prefix, so a plan moves between the test and main copies too.
 function planStorageKeys(){
   return [STORAGE_KEY, PROFILE_KEY, PICKS_KEY, ACTIVITY_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY,
-    SEASON_KEY, MEAL_EATEN_KEY, EXAMS_KEY, WEEK_CHANGES_KEY];
+    SEASON_KEY, MEAL_EATEN_KEY, EXAMS_KEY, WEEK_CHANGES_KEY, ONE_TIME_KEY];
 }
 function planKeyName(storageKey){ return storageKey.slice(STORAGE_PREFIX.length); }
 
@@ -2233,6 +2312,7 @@ function usePastedPlan(){
   }
   loadSavedPlan();
   state.selectedDay = null; state.changeFormFor = null; state.customFormGap = null; state.expandedGaps = {};
+  state.oneTimeFormOpen = false;
   movePlan = {mode:"done", commitments:movePlan.commitments, exams:movePlan.exams};
   startFreshMessage = {text:"", count:-1};
   renderCommitList(); renderExamList(); renderProfileInputs(); renderSchedule(); renderMovePlan();
@@ -2806,6 +2886,7 @@ function loadSavedPlan(){
   loadMealEaten();
   loadExams();
   loadWeekChanges();
+  loadOneTimeEvents();
 }
 
 function init(){
@@ -2874,11 +2955,21 @@ function init(){
     if(changeFormEl && ev.target.closest("[data-change-skip]")) skipThisWeek(changeFormEl.dataset.changeDay, changeFormEl.dataset.changeId);
     if(changeFormEl && ev.target.closest("[data-change-save]")) saveChangedTime(changeFormEl);
     if(ev.target.closest("[data-change-cancel]")){ state.changeFormFor = null; renderSchedule(); }
+    if(ev.target.closest("[data-one-time-open]")){
+      state.oneTimeFormOpen = true; renderSchedule();
+      document.querySelector("#dayDetail [data-one-time-title]").focus();
+    }
+    if(ev.target.closest("[data-one-time-cancel]")){ state.oneTimeFormOpen = false; renderSchedule(); }
+    if(ev.target.closest("[data-one-time-save]")) saveOneTimeEvent(ev.target.closest(".one-time-form"), state.selectedDay);
+    var oneTimeRemoveBtn = ev.target.closest("[data-one-time-remove]");
+    if(oneTimeRemoveBtn) removeOneTimeEvent(oneTimeRemoveBtn.dataset.oneTimeRemove);
   });
   // Enter in the custom form saves it.
   document.getElementById("dayDetail").addEventListener("keydown", function(ev){
     var form = ev.target.closest(".custom-form");
     if(form && ev.key==="Enter" && ev.target.tagName==="INPUT"){ ev.preventDefault(); saveCustomIdea(form); }
+    var oneTimeFormEl = ev.target.closest(".one-time-form");
+    if(oneTimeFormEl && ev.key==="Enter" && ev.target.tagName==="INPUT"){ ev.preventDefault(); saveOneTimeEvent(oneTimeFormEl, state.selectedDay); }
   });
   document.getElementById("movePlan").addEventListener("click", function(ev){
     if(ev.target.closest("[data-copy-plan]")) copyPlan();
