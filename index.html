@@ -390,6 +390,10 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .start-fresh .start-fresh-actions{display:flex;flex-wrap:wrap;gap:8px;}
 .start-fresh .btn{font-size:16px;padding:6px 14px 4px;}
 .start-fresh .btn.danger{background:var(--danger);}
+/* Move your plan: copy it out of one app and paste it into another. */
+.move-plan textarea{display:block;width:100%;min-height:96px;margin:0 0 8px;padding:8px;font:12.5px/1.4 ui-monospace,Menlo,monospace;
+  border:2px solid var(--ink);background:var(--surface);color:var(--ink);box-sizing:border-box;}
+.move-plan .custom-error{margin:0 0 8px;}
 .commit-row{
   display:flex;align-items:center;gap:12px;padding:10px 12px;border:2px solid var(--line);
   background:var(--surface);margin-bottom:8px;
@@ -647,6 +651,7 @@ footer.foot{
     <p class="section-sub">Repeats weekly on the days you pick.</p>
 
     <div class="start-fresh" id="startFresh" role="region" aria-label="Start fresh" aria-live="polite"></div>
+    <div class="start-fresh move-plan" id="movePlan" role="region" aria-label="Move your plan" aria-live="polite"></div>
 
     <form class="card" id="commitForm" style="padding:20px;">
       <div class="form-grid">
@@ -1456,6 +1461,7 @@ function countableWeek(){
 }
 
 function loadSeason(){
+  state.season = "in";
   try{ if(localStorage.getItem(SEASON_KEY)==="out") state.season = "out"; }
   catch(e){ /* storage unavailable \u2014 stay in season */ }
 }
@@ -2141,6 +2147,128 @@ function startFresh(){
   renderCommitList(); renderExamList(); renderSchedule();
 }
 
+/* Move your plan: on iPhone the home screen app keeps its own storage, separate from Safari, so
+   a plan is copied out as text from one and pasted into the other. Nothing leaves the phone. */
+var PLAN_TEXT_APP = "illini-playbook";
+var PLAN_TEXT_VERSION = 1;
+// Longer than any real plan; anything bigger isn't one.
+var MAX_PLAN_TEXT = 500000;
+// Saved without the test copy's prefix, so a plan moves between the test and main copies too.
+function planStorageKeys(){
+  return [STORAGE_KEY, PROFILE_KEY, PICKS_KEY, ACTIVITY_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY,
+    SEASON_KEY, MEAL_EATEN_KEY, EXAMS_KEY, WEEK_CHANGES_KEY];
+}
+function planKeyName(storageKey){ return storageKey.slice(STORAGE_PREFIX.length); }
+
+// What the Move your plan card shows: idle, copied, copyFallback, paste, confirm or done.
+var movePlan = {mode:"idle"};
+
+function planText(){
+  var data = {};
+  planStorageKeys().forEach(function(key){
+    var value = null;
+    try{ value = localStorage.getItem(key); }catch(e){ /* storage unavailable \u2014 copy what's in memory */ }
+    if(value!==null) data[planKeyName(key)] = value;
+  });
+  // The sample week isn't saved until it's changed, so the schedule always comes from what's shown.
+  data[planKeyName(STORAGE_KEY)] = JSON.stringify(state.commitments);
+  return JSON.stringify({app:PLAN_TEXT_APP, version:PLAN_TEXT_VERSION, copied:dateOfThisWeek(todayName()), data:data});
+}
+
+function countText(n, word){ return n+" "+word+(n===1?"":"s"); }
+
+function copyPlan(){
+  var text = planText();
+  var copied = {mode:"copied", count:state.commitments.length};
+  var fallback = {mode:"copyFallback", text:text};
+  if(!navigator.clipboard || !navigator.clipboard.writeText){ movePlan = fallback; renderMovePlan(); return; }
+  navigator.clipboard.writeText(text)
+    .then(function(){ movePlan = copied; }, function(){ movePlan = fallback; })
+    .then(renderMovePlan);
+}
+
+function isValidCommitment(c){
+  return c && typeof c==="object" && typeof c.id==="string" && c.id &&
+    typeof c.title==="string" && c.title.trim() && typeof c.type==="string" &&
+    Array.isArray(c.days) && c.days.length>0 && c.days.every(function(d){ return DAYS.indexOf(d)>=0; }) &&
+    /^\d{2}:\d{2}$/.test(c.start) && /^\d{2}:\d{2}$/.test(c.end) && toMin(c.end) > toMin(c.start);
+}
+
+// Checks pasted text and, if it's a plan, asks before replacing anything.
+function checkPastedPlan(text){
+  var trimmed = (text||"").trim();
+  var fail = function(message){ movePlan = {mode:"paste", text:text, error:message}; renderMovePlan(); };
+  if(!trimmed) return fail("Paste the plan you copied first.");
+  if(trimmed.length > MAX_PLAN_TEXT) return fail("That\u2019s too long to be a copied plan.");
+  var plan;
+  try{ plan = JSON.parse(trimmed); }catch(e){ plan = null; }
+  if(!plan || plan.app!==PLAN_TEXT_APP || !plan.data || typeof plan.data!=="object"){
+    return fail("That isn\u2019t a copied plan. In the other app, tap Copy my plan, then paste here.");
+  }
+  if(plan.version > PLAN_TEXT_VERSION) return fail("This plan came from a newer version of the app. Reload this app and try again.");
+  var commitments;
+  try{ commitments = JSON.parse(plan.data[planKeyName(STORAGE_KEY)]); }catch(e){ commitments = null; }
+  var valuesAreText = Object.keys(plan.data).every(function(k){ return typeof plan.data[k]==="string"; });
+  if(!Array.isArray(commitments) || !commitments.every(isValidCommitment) || !valuesAreText){
+    return fail("Part of this plan is missing or damaged. Copy it again in the other app.");
+  }
+  var exams = [];
+  try{ exams = JSON.parse(plan.data[planKeyName(EXAMS_KEY)] || "[]"); }catch(e){ exams = []; }
+  movePlan = {mode:"confirm", plan:plan, commitments:commitments.length, exams:Array.isArray(exams) ? exams.length : 0};
+  renderMovePlan();
+}
+
+function usePastedPlan(){
+  var plan = movePlan.plan;
+  try{
+    planStorageKeys().forEach(function(key){
+      var value = plan.data[planKeyName(key)];
+      if(typeof value==="string") localStorage.setItem(key, value);
+      else localStorage.removeItem(key);
+    });
+  }catch(e){
+    movePlan = {mode:"paste", error:"This app couldn\u2019t save the plan. Check that the browser isn\u2019t in Private mode, then try again."};
+    renderMovePlan();
+    return;
+  }
+  loadSavedPlan();
+  state.selectedDay = null; state.changeFormFor = null; state.customFormGap = null; state.expandedGaps = {};
+  movePlan = {mode:"done", commitments:movePlan.commitments, exams:movePlan.exams};
+  startFreshMessage = {text:"", count:-1};
+  renderCommitList(); renderExamList(); renderProfileInputs(); renderSchedule(); renderMovePlan();
+}
+
+function renderMovePlan(){
+  var el = document.getElementById("movePlan");
+  var m = movePlan;
+  var buttons = '<div class="start-fresh-actions"><button type="button" class="btn secondary" data-copy-plan>Copy my plan</button>'+
+    '<button type="button" class="btn secondary" data-paste-plan>Paste a plan</button></div>';
+  var html;
+  if(m.mode==="copied"){
+    html = '<p><b>Copied your plan ('+countText(m.count, "commitment")+').</b> Open Playbook from your home screen (or your new phone), go to <b>Add</b>, tap <b>Paste a plan</b> and paste it in.</p>'+buttons;
+  } else if(m.mode==="copyFallback"){
+    html = '<p>Your browser didn\u2019t allow copying automatically. Select all the text below and copy it.</p>'+
+      '<textarea readonly aria-label="Your plan as text">'+escapeHtml(m.text)+'</textarea>'+
+      '<div class="start-fresh-actions"><button type="button" class="btn secondary" data-move-cancel>Done</button></div>';
+  } else if(m.mode==="paste"){
+    html = '<p>Paste the plan you copied in the other app.</p>'+
+      '<textarea id="pastePlanText" aria-label="Paste your plan here" placeholder="Paste your plan here">'+escapeHtml(m.text||"")+'</textarea>'+
+      '<p class="custom-error" role="alert">'+escapeHtml(m.error||"")+'</p>'+
+      '<div class="start-fresh-actions"><button type="button" class="btn" data-check-plan>Use this plan</button>'+
+      '<button type="button" class="btn secondary" data-move-cancel>Cancel</button></div>';
+  } else if(m.mode==="confirm"){
+    html = '<p><b>Replace everything here?</b> The pasted plan has '+countText(m.commitments, "commitment")+' and '+countText(m.exams, "exam")+
+      (m.plan.copied && isDateText(m.plan.copied) ? ', copied '+shortDate(m.plan.copied) : '')+
+      '. It replaces this app\u2019s schedule, picks, check-offs, exams and weight. It can\u2019t be undone.</p>'+
+      '<div class="start-fresh-actions"><button type="button" class="btn danger" data-use-plan>Yes, replace</button>'+
+      '<button type="button" class="btn secondary" data-move-cancel>Cancel</button></div>';
+  } else {
+    html = (m.mode==="done" ? '<p><b>Plan moved in: '+countText(m.commitments, "commitment")+' and '+countText(m.exams, "exam")+'.</b></p>' : '')+
+      '<p>Moving to the home screen app or a new phone? Copy your plan here, then paste it there.</p>'+buttons;
+  }
+  el.innerHTML = html;
+}
+
 function loadSampleWeek(){
   state.commitments = sampleWeek();
   saveCommitments();
@@ -2665,8 +2793,10 @@ function renderInfo(){
 /* ============================================================
    INIT
 ============================================================ */
-function init(){
+// Reads everything the plan saves, at start-up and after pasting a plan in.
+function loadSavedPlan(){
   loadCommitments();
+  state.profile = {weight:null, load:"hard"};
   loadProfile();
   loadMealPicks();
   loadActivityPicks();
@@ -2676,11 +2806,16 @@ function init(){
   loadMealEaten();
   loadExams();
   loadWeekChanges();
+}
+
+function init(){
+  loadSavedPlan();
   buildDayPick();
   buildHallFilterOptions();
   renderSchedule();
   renderCommitList();
   renderExamList();
+  renderMovePlan();
   renderDirectory();
   buildFuelDaySelector();
   renderProfileInputs();
@@ -2744,6 +2879,13 @@ function init(){
   document.getElementById("dayDetail").addEventListener("keydown", function(ev){
     var form = ev.target.closest(".custom-form");
     if(form && ev.key==="Enter" && ev.target.tagName==="INPUT"){ ev.preventDefault(); saveCustomIdea(form); }
+  });
+  document.getElementById("movePlan").addEventListener("click", function(ev){
+    if(ev.target.closest("[data-copy-plan]")) copyPlan();
+    if(ev.target.closest("[data-paste-plan]")){ movePlan = {mode:"paste"}; renderMovePlan(); document.getElementById("pastePlanText").focus(); }
+    if(ev.target.closest("[data-check-plan]")) checkPastedPlan(document.getElementById("pastePlanText").value);
+    if(ev.target.closest("[data-use-plan]")) usePastedPlan();
+    if(ev.target.closest("[data-move-cancel]")){ movePlan = {mode:"idle"}; renderMovePlan(); }
   });
   document.getElementById("tourReplay").addEventListener("click", function(){ startTour(); });
   document.getElementById("startFresh").addEventListener("click", function(ev){
