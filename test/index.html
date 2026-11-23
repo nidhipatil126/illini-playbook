@@ -199,6 +199,14 @@ p.section-sub{margin:0 0 18px;color:var(--ink-soft);font-size:14px;font-weight:6
 .install-tip .btn{margin-top:8px;font-size:16px;padding:5px 14px 3px;}
 .install-tip-close{position:absolute;top:6px;right:6px;width:36px;height:36px;font:inherit;font-size:22px;line-height:1;
   cursor:pointer;background:none;border:none;color:var(--ink-soft);}
+/* Sleep: bedtime in Next up, wake-up time at the top of each day. */
+.sleep-line .pick-btn{margin-left:6px;}
+.sleep-form{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 12px;margin:6px 0 6px 16px;}
+.sleep-form label{font-size:12.5px;font-weight:700;color:var(--ink-soft);}
+.sleep-form select{display:block;margin-top:2px;padding:5px 6px;font:inherit;font-size:14px;border:2px solid var(--ink);background:var(--surface);color:var(--ink);}
+.sleep-form .btn{font-size:16px;padding:5px 14px 3px;}
+.day-wake{margin:0 0 10px;font-size:14px;font-weight:700;color:var(--navy);}
+.day-wake small{font-weight:400;color:var(--ink-soft);}
 .next-up h3{margin:0 0 8px;font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-soft);}
 .next-up p{margin:0 0 4px;}
 .next-up .sub{margin:0 0 6px 16px;font-size:13.5px;color:var(--ink-soft);}
@@ -972,6 +980,7 @@ var INSTALL_TIP_KEY = STORAGE_PREFIX + "illini-playbook-install-tip-v1";
 var WEEK_CHANGES_KEY = STORAGE_PREFIX + "illini-playbook-week-changes-v1";
 var ONE_TIME_KEY = STORAGE_PREFIX + "illini-playbook-one-time-v1";
 var WEEK_PICKS_KEY = STORAGE_PREFIX + "illini-playbook-week-picks-v1";
+var SLEEP_KEY = STORAGE_PREFIX + "illini-playbook-sleep-v1";
 if (IS_TEST_COPY) {
   var testBanner = document.createElement("p");
   testBanner.className = "test-copy-banner";
@@ -1018,7 +1027,9 @@ var state = {
   weekChanges: {},     // change key (date + commitment id) -> {skip:true} or {start:"15:00", end:"17:30"}
   changeFormFor: null, // "day|commitment id" whose "Change this week" form is open, or null
   oneTimeEvents: [],   // this week's one-time events: {id, title, type, date:"2026-11-26", start, end}
-  oneTimeFormOpen: false // whether the open day's "Add one-time event" form is showing
+  oneTimeFormOpen: false, // whether the open day's "Add one-time event" form is showing
+  sleep: {hours:8, readyMin:60}, // sleep goal and time to get ready before the first commitment
+  sleepFormOpen: false   // whether Next up's sleep settings are showing
 };
 
 // A sample athlete week, shown on a first visit and by "Load the sample week".
@@ -2024,6 +2035,7 @@ function renderDayDetail(byDay){
   el.innerHTML = '<div class="day-detail" role="region" aria-label="'+DAY_FULL[day]+' details">'+
     '<div class="day-detail-head"><h3>'+DAY_FULL[day]+'</h3>'+
     '<button type="button" class="btn secondary" data-close-day>Close</button></div>'+
+    wakeLine(events.slice().sort(function(a,b){ return a.startMin-b.startMin; }))+
     examLines(examsOn(dateText))+
     (soon ? '<p class="study-first-note">'+escapeHtml(soon.exam.name)+' '+
       (soon.days===0 ? 'is today' : 'in '+soon.days+' day'+(soon.days>1?'s':''))+' \u2014 Study ideas are listed first.</p>' : '')+
@@ -2218,12 +2230,76 @@ function nextUpLines(byDay, now){
       (next.ref.loc ? '<p class="sub">'+escapeHtml(next.ref.loc)+'</p>' : ''));
   } else {
     var tomorrow = DAYS[(DAYS.indexOf(day)+1)%7];
-    var first = byDay[tomorrow].slice().sort(function(a,b){ return a.startMin-b.startMin; })[0];
+    var first = eventsOn(tomorrow, byDay, day==="Sun")[0];
     lines.push('<p><b>'+(events.length ? 'Done for today.' : 'Nothing scheduled today.')+'</b> '+(first
       ? 'Tomorrow starts with '+escapeHtml(first.ref.title)+' at '+minToClock(first.startMin)+'.'
       : 'Tomorrow is free.')+'</p>');
   }
+  if(minute >= SLEEP_REMINDER_FROM_MIN) lines.push(sleepLine(byDay, day, minute));
   return {day:day, html:lines.join("")};
+}
+
+/* Sleep: wake up readyMin before the day's first commitment, and go to bed `hours` before that. */
+var SLEEP_HOUR_CHOICES = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
+var READY_MIN_CHOICES = [30, 45, 60, 90];
+// With nothing scheduled, still wake by this time, so a free day doesn't turn into oversleeping.
+var FREE_DAY_WAKE_MIN = 9*60;
+// Next up shows the bedtime from this time on.
+var SLEEP_REMINDER_FROM_MIN = 18*60;
+
+function loadSleep(){
+  state.sleep = {hours:8, readyMin:60};
+  var saved = loadPickMap(SLEEP_KEY);
+  if(SLEEP_HOUR_CHOICES.indexOf(saved.hours)>=0) state.sleep.hours = saved.hours;
+  if(READY_MIN_CHOICES.indexOf(saved.readyMin)>=0) state.sleep.readyMin = saved.readyMin;
+}
+function saveSleep(){ savePickMap(SLEEP_KEY, state.sleep); }
+
+// A day's commitments; tomorrow after Sunday is next week's Monday, with next week's changes.
+function eventsOn(day, byDay, nextWeek){
+  return (nextWeek ? expandByDay(-1) : byDay)[day].slice().sort(function(a,b){ return a.startMin-b.startMin; });
+}
+
+// {wakeMin, bedMin (minutes after the previous midnight; negative means before it), first event or null}
+function sleepPlan(events){
+  var first = events[0] || null;
+  var wake = first ? Math.max(0, first.startMin - state.sleep.readyMin) : FREE_DAY_WAKE_MIN;
+  return {wakeMin:wake, bedMin:wake - state.sleep.hours*60, first:first};
+}
+
+function clockAt(min){ return minToClock(((min % 1440) + 1440) % 1440); }
+
+function sleepHoursText(hours){ return (hours % 1 ? hours.toFixed(1) : hours)+'h'; }
+
+function sleepLine(byDay, day, minute){
+  var isSunday = day==="Sun";
+  var tomorrow = DAYS[(DAYS.indexOf(day)+1)%7];
+  var plan = sleepPlan(eventsOn(tomorrow, byDay, isSunday));
+  var bedTonight = plan.bedMin + 1440;   // minutes after today's midnight
+  var why = plan.first
+    ? 'to wake at '+clockAt(plan.wakeMin)+' for '+escapeHtml(plan.first.ref.title)+' ('+minToClock(plan.first.startMin)+')'
+    : 'to wake at '+clockAt(plan.wakeMin)+' \u2014 tomorrow is free';
+  var text = minute >= bedTonight
+    ? '<b>Sleep:</b> Past bedtime for '+sleepHoursText(state.sleep.hours)+' of sleep '+why+'. Head to bed.'
+    : '<b>Sleep:</b> Bed by '+clockAt(bedTonight)+' '+why+'.';
+  return '<p class="sleep-line">'+text+
+    (state.sleepFormOpen ? '' : ' <button type="button" class="pick-btn" data-sleep-open>Change</button>')+'</p>'+
+    (state.sleepFormOpen ? sleepForm() : '');
+}
+
+function sleepForm(){
+  var option = function(value, label, current){ return '<option value="'+value+'"'+(value===current?' selected':'')+'>'+label+'</option>'; };
+  return '<div class="sleep-form">'+
+    '<label>Sleep<select data-sleep-hours>'+SLEEP_HOUR_CHOICES.map(function(h){ return option(h, sleepHoursText(h), state.sleep.hours); }).join("")+'</select></label>'+
+    '<label>Get ready<select data-sleep-ready>'+READY_MIN_CHOICES.map(function(m){ return option(m, lengthText(m), state.sleep.readyMin); }).join("")+'</select></label>'+
+    '<button type="button" class="btn secondary" data-sleep-done>Done</button></div>';
+}
+
+function wakeLine(events){
+  var plan = sleepPlan(events);
+  return '<p class="day-wake">Wake up by '+clockAt(plan.wakeMin)+' <small>'+
+    (plan.first ? lengthText(state.sleep.readyMin)+' before '+escapeHtml(plan.first.ref.title)+' \u00b7 ' : 'Nothing scheduled \u00b7 ')+
+    'bed by '+clockAt(plan.bedMin)+' the night before</small></p>';
 }
 
 function renderNextUp(byDay){
@@ -2299,7 +2375,7 @@ var MAX_PLAN_TEXT = 500000;
 // Saved without the test copy's prefix, so a plan moves between the test and main copies too.
 function planStorageKeys(){
   return [STORAGE_KEY, PROFILE_KEY, PICKS_KEY, ACTIVITY_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY,
-    SEASON_KEY, MEAL_EATEN_KEY, EXAMS_KEY, WEEK_CHANGES_KEY, ONE_TIME_KEY, WEEK_PICKS_KEY];
+    SEASON_KEY, MEAL_EATEN_KEY, EXAMS_KEY, WEEK_CHANGES_KEY, ONE_TIME_KEY, WEEK_PICKS_KEY, SLEEP_KEY];
 }
 function planKeyName(storageKey){ return storageKey.slice(STORAGE_PREFIX.length); }
 
@@ -2952,6 +3028,7 @@ function loadSavedPlan(){
   loadExams();
   loadWeekChanges();
   loadOneTimeEvents();
+  loadSleep();
 }
 
 function init(){
@@ -2979,8 +3056,18 @@ function init(){
     if(eatenBtn) toggleMealEaten(eatenBtn.dataset.eatenGap);
     var planBtn = ev.target.closest("[data-plan-day]");
     if(planBtn) planDay(planBtn.dataset.planDay);
+    if(ev.target.closest("[data-sleep-open]")){ state.sleepFormOpen = true; renderSchedule(); }
+    if(ev.target.closest("[data-sleep-done]")){ state.sleepFormOpen = false; renderSchedule(); }
   });
-  setInterval(function(){ renderNextUp(); }, NEXT_UP_REFRESH_MS);
+  document.getElementById("nextUp").addEventListener("change", function(ev){
+    if(ev.target.matches("[data-sleep-hours]")) state.sleep.hours = Number(ev.target.value);
+    else if(ev.target.matches("[data-sleep-ready]")) state.sleep.readyMin = Number(ev.target.value);
+    else return;
+    saveSleep();
+    renderSchedule();
+  });
+  // Skipped while the sleep settings are open, so a menu isn't redrawn while you use it.
+  setInterval(function(){ if(!state.sleepFormOpen) renderNextUp(); }, NEXT_UP_REFRESH_MS);
   document.getElementById("snapshot").addEventListener("click", function(ev){
     var tile = ev.target.closest("[data-day]");
     if(tile) toggleDay(tile.dataset.day);
