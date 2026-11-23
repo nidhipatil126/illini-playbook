@@ -278,6 +278,15 @@ p.section-sub{margin:0 0 18px;color:var(--ink-soft);font-size:14px;font-weight:6
 .one-time-tag{display:inline-block;margin-left:6px;padding:0 6px;font-size:11px;font-weight:800;letter-spacing:.4px;
   text-transform:uppercase;vertical-align:2px;border:1.5px solid var(--navy);color:var(--navy);}
 .one-time-add{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
+/* Breaks: date ranges when classes and study hall pause. */
+.break-banner{margin:0 0 10px;padding:6px 10px;font-size:14px;border-left:4px solid var(--navy);background:var(--surface-2);}
+.snap-day .break-tag{color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:2px 6px;background:var(--ink-soft);}
+.breaks-card{margin-top:22px;}
+.breaks-card h3{margin:0 0 4px;font-family:var(--font-display);font-size:20px;}
+.breaks-card .commit-list{margin-top:10px;}
+.break-form label.full{display:block;margin-bottom:8px;font-size:12.5px;font-weight:700;color:var(--ink-soft);}
+.break-form label.full input{display:block;width:100%;margin-top:2px;padding:6px 8px;font:inherit;font-size:14px;
+  border:2px solid var(--ink);background:var(--surface);color:var(--ink);box-sizing:border-box;}
 .one-time-form label.full{display:block;margin-bottom:8px;font-size:12.5px;font-weight:700;color:var(--ink-soft);}
 .one-time-form label.full input,.one-time-form label.full select{display:block;width:100%;margin-top:2px;padding:6px 8px;font:inherit;font-size:14px;
   border:2px solid var(--ink);background:var(--surface);color:var(--ink);box-sizing:border-box;}
@@ -677,6 +686,8 @@ footer.foot{
       <span><i class="type-interview"></i> Interview</span>
       <span><i class="type-other"></i> Other</span>
     </div>
+
+    <div class="start-fresh breaks-card" id="breaks" role="region" aria-label="Breaks" aria-live="polite"></div>
   </section>
 
   <!-- ============ ADD TAB ============ -->
@@ -1000,6 +1011,7 @@ var WEEK_PICKS_KEY = STORAGE_PREFIX + "illini-playbook-week-picks-v1";
 var SLEEP_KEY = STORAGE_PREFIX + "illini-playbook-sleep-v1";
 var SLEEP_LOG_KEY = STORAGE_PREFIX + "illini-playbook-sleep-log-v1";
 var ENERGY_LOG_KEY = STORAGE_PREFIX + "illini-playbook-energy-log-v1";
+var BREAKS_KEY = STORAGE_PREFIX + "illini-playbook-breaks-v1";
 if (IS_TEST_COPY) {
   var testBanner = document.createElement("p");
   testBanner.className = "test-copy-banner";
@@ -1047,6 +1059,8 @@ var state = {
   changeFormFor: null, // "day|commitment id" whose "Change this week" form is open, or null
   oneTimeEvents: [],   // this week's one-time events: {id, title, type, date:"2026-11-26", start, end}
   oneTimeFormOpen: false, // whether the open day's "Add one-time event" form is showing
+  breaks: [],           // {id, name, from, to}: date ranges when classes and study hall pause
+  breakFormOpen: false, // whether the Breaks card's "Add break" form is showing
   sleep: {hours:8, readyMin:60}, // sleep goal and time to get ready before the first commitment
   sleepFormOpen: false,  // whether Next up's sleep settings are showing
   sleepLog: {},          // morning date ("2026-11-23") -> "ontime" | "late" | "overslept"
@@ -1181,6 +1195,7 @@ function expandByDay(weeksBack){
   state.commitments.forEach(function(c){
     c.days.forEach(function(d){
       if(!byDay[d]) return;
+      if(isPausedOnBreak(c, dateOfThisWeek(d, weeksBack))) return;
       var change = state.weekChanges[weekChangeKey(d, c.id, weeksBack)];
       if(change && change.skip) return;
       var event = {ref:c, startMin: toMin(c.start), endMin: toMin(c.end)};
@@ -1251,6 +1266,94 @@ function removeOneTimeEvent(id){
   state.oneTimeEvents = state.oneTimeEvents.filter(function(x){ return x.id!==id; });
   saveOneTimeEvents();
   renderSchedule();
+}
+
+/* Breaks: a date range (Thanksgiving, spring break) when weekly classes and study hall pause.
+   Training and everything else stays, since teams often keep practicing over break. */
+var BREAK_PAUSED_TYPES = ["class", "studyhall"];
+var MAX_BREAK_NAME = 60;
+var MAX_BREAK_DAYS = 120;
+
+function loadBreaks(){
+  var saved;
+  try{ saved = JSON.parse(localStorage.getItem(BREAKS_KEY)); }
+  catch(e){ saved = null; /* unreadable — start with no breaks */ }
+  // Kept a week after they end, so Recap's last-week look still leaves classes out.
+  var oldest = dateOfThisWeek("Mon", 1);
+  state.breaks = Array.isArray(saved) ? saved.filter(function(b){
+    return b && typeof b.id==="string" && typeof b.name==="string" && b.name &&
+      isDateText(b.from) && isDateText(b.to) && b.from <= b.to && b.to >= oldest;
+  }) : [];
+}
+function saveBreaks(){
+  try{ localStorage.setItem(BREAKS_KEY, JSON.stringify(state.breaks)); }
+  catch(e){ /* storage unavailable — breaks still hold for this session */ }
+}
+
+function breakOn(dateText){
+  return state.breaks.filter(function(b){ return b.from <= dateText && dateText <= b.to; })[0] || null;
+}
+function isPausedOnBreak(commitment, dateText){
+  return BREAK_PAUSED_TYPES.indexOf(commitment.type)>=0 && !!breakOn(dateText);
+}
+
+function breakRangeText(b){ return b.from===b.to ? shortDate(b.from) : shortDate(b.from)+' – '+shortDate(b.to); }
+
+function renderBreaks(){
+  var el = document.getElementById("breaks");
+  var weekStart = dateOfThisWeek("Mon");
+  var shown = state.breaks.filter(function(b){ return b.to >= weekStart; })
+    .sort(function(a,b){ return a.from<b.from ? -1 : a.from>b.from ? 1 : 0; });
+  var list = shown.length ? '<div class="commit-list">'+shown.map(function(b){
+    return '<div class="commit-row">'+
+      '<div class="swatch" style="background:var(--ink-soft);"></div>'+
+      '<div class="info"><b>'+escapeHtml(b.name)+'</b><div class="meta">'+breakRangeText(b)+'</div></div>'+
+      '<div class="actions"><button class="icon" data-break-remove="'+escapeAttr(b.id)+'" style="color:var(--danger);" aria-label="Remove '+escapeAttr(b.name)+'">Remove</button></div>'+
+      '</div>';
+  }).join("")+'</div>' : '';
+  var form = state.breakFormOpen
+    ? '<div class="change-form break-form">'+
+        '<label class="full">Name<input type="text" data-break-name maxlength="'+MAX_BREAK_NAME+'" placeholder="Thanksgiving break"></label>'+
+        '<div class="change-times">'+
+          '<label>First day<input type="date" data-break-from></label>'+
+          '<label>Last day<input type="date" data-break-to></label>'+
+        '</div>'+
+        '<p class="custom-error" role="alert"></p>'+
+        '<div class="change-actions"><button type="button" class="btn" data-break-save>Add</button>'+
+        '<button type="button" class="btn secondary" data-break-cancel>Cancel</button></div>'+
+      '</div>'
+    : '<div class="start-fresh-actions"><button type="button" class="btn secondary" data-break-open>+ Add break</button></div>';
+  el.innerHTML = '<h3>Breaks</h3>'+
+    '<p>Classes and study hall pause on break days; training stays. Gaps put rest and side projects first.</p>'+
+    list+form;
+}
+
+function saveBreak(form){
+  var name = form.querySelector("[data-break-name]").value.trim().slice(0, MAX_BREAK_NAME);
+  var from = form.querySelector("[data-break-from]").value;
+  var to = form.querySelector("[data-break-to]").value;
+  var error = form.querySelector(".custom-error");
+  if(!name){ error.textContent = "Give the break a name."; return; }
+  if(!isDateText(from) || !isDateText(to)){ error.textContent = "Pick a first and last day."; return; }
+  if(to < from){ error.textContent = "The last day has to be on or after the first day."; return; }
+  if((dateFromText(to)-dateFromText(from))/DAY_MS >= MAX_BREAK_DAYS){ error.textContent = "Keep a break under "+MAX_BREAK_DAYS+" days."; return; }
+  state.breaks.push({id:uid(), name:name, from:from, to:to});
+  saveBreaks();
+  state.breakFormOpen = false;
+  renderBreaks();
+  renderSchedule();
+}
+
+function removeBreak(id){
+  state.breaks = state.breaks.filter(function(b){ return b.id!==id; });
+  saveBreaks();
+  renderBreaks();
+  renderSchedule();
+}
+
+function breakBanner(dateText){
+  var b = breakOn(dateText);
+  return b ? '<p class="break-banner"><b>'+escapeHtml(b.name)+'</b> · classes and study hall paused</p>' : '';
 }
 
 /* One-off changes: skip or move a weekly commitment for one date only. They are saved with that
@@ -1352,7 +1455,8 @@ function renderSnapshot(byDay){
       : '<div class="bar" style="height:'+barH.toFixed(0)+'px"></div>';
     var tags = (d===today ? '<span class="today-tag">Today</span>' : '')+
       (i===busiestIdx && max>0 ? '<span class="busy-tag">Busiest</span>' : '')+
-      examTag(examsOn(dateOfThisWeek(d)));
+      examTag(examsOn(dateOfThisWeek(d)))+
+      (breakOn(dateOfThisWeek(d)) ? '<span class="break-tag">Break</span>' : '');
     var classes = "snap-day"+(i===busiestIdx && max>0 ? " busiest":"")+(state.selectedDay===d ? " selected":"");
     return '<button type="button" class="'+classes+'" data-day="'+d+'" aria-expanded="'+(state.selectedDay===d)+'" aria-controls="dayDetail">'+
       (tags ? '<span class="tile-tags">'+tags+'</span>' : '')+
@@ -1377,9 +1481,11 @@ var ACTIVITY_IDEAS = [
   {name:"Email a professor about travel", minutes:15, group:"study"},
   {name:"Review flashcards", minutes:20, group:"study"},
   {name:"Review game film", minutes:30, group:"study"},
-  {name:"Update your r\u00e9sum\u00e9", minutes:45, group:"study"},
+  {name:"Update your r\u00e9sum\u00e9", minutes:45, group:"study", career:true},
   {name:"Study hall hours", minutes:60, group:"study"},
-  {name:"Career fair prep", minutes:90, group:"study"},
+  {name:"Career fair prep", minutes:90, group:"study", career:true},
+  // Only offered on break days (see breakIdeas).
+  {name:"Work on a side project", minutes:60, group:"study", career:true, when:"break"},
   {name:"Quiet time, phone away", minutes:15, group:"rest"},
   {name:"20-min nap (set a timer)", minutes:20, group:"rest", when:"notAfter"},
   {name:"Music or podcast break", minutes:20, group:"rest"},
@@ -1399,9 +1505,20 @@ function ideasFor(gapMinutes, gapKind){
       if(idea.group!==group || idea.minutes > gapMinutes) return false;
       if(idea.when==="after") return afterTraining;
       if(idea.when==="notAfter") return !afterTraining;
-      return true;
+      return idea.when!=="break";
     }).sort(function(a,b){ return (b.when==="after")-(a.when==="after") || b.minutes-a.minutes; })[0];
   }).filter(Boolean);
+}
+
+/* Break days: rest first, then a career idea (résumé, side project) in place of the usual study one. */
+var BREAK_GROUP_ORDER = ["rest", "study", "recover"];
+
+function breakIdeas(ideas, gapMinutes){
+  var career = ACTIVITY_IDEAS.filter(function(idea){ return idea.career && idea.minutes <= gapMinutes; })
+    .sort(function(a,b){ return b.minutes-a.minutes; })[0];
+  var swapped = ideas.map(function(idea){ return idea.group==="study" && career ? career : idea; });
+  if(career && !swapped.some(function(i){ return i===career; })) swapped.push(career);
+  return swapped.sort(function(a,b){ return BREAK_GROUP_ORDER.indexOf(a.group)-BREAK_GROUP_ORDER.indexOf(b.group); });
 }
 
 /* Afternoon energy dip: a gap that overlaps 1-4 PM lists pick-me-ups first. */
@@ -2013,6 +2130,7 @@ function renderDayDetail(byDay){
   var dateText = dateOfThisWeek(day);
   var soon = upcomingExam(dateText);
   var skipped = skippedOn(day);
+  var onBreak = !!breakOn(dateText);
   var rows = events.map(function(e){
     var meta = TYPE_META[e.ref.type] || TYPE_META.other;
     var idAttr = escapeAttr(e.ref.id);
@@ -2045,6 +2163,7 @@ function renderDayDetail(byDay){
     // A study pick for an exam that's passed or removed no longer counts, so the gap shows as open.
     if(picked && picked.indexOf(EXAM_STUDY_PREFIX)===0 && !pickedIdeaFor(key)) picked = null;
     var ideas = ideasFor(g.end-g.start, classifyGap(g, events).kind);
+    if(onBreak) ideas = breakIdeas(ideas, g.end-g.start);
     var slump = isSlumpGap(g);
     if(slump){
       var pickMeUps = slumpIdeas(g.end-g.start, classifyGap(g, events).kind);
@@ -2064,6 +2183,7 @@ function renderDayDetail(byDay){
       '<div class="time">'+minToClock(g.start)+'\u2013'+minToClock(g.end)+'</div>'+
       '<div class="swatch"></div>'+
       '<div class="what">Free \u00b7 '+lengthText(g.end-g.start)+' <small>'+classifyGap(g, events).label+' window</small>'+
+        (onBreak ? '<div class="slump-note">Break day \u2014 rest and side projects first</div>' : '')+
         (slump ? '<div class="slump-note">Energy dip \u2014 pick-me-ups first</div>' : '')+
         (energy ? '<div class="slump-note">'+ENERGY_NOTES[energy]+'</div>' : '')+
         (meal ? mealLine(key, meal, state.mealEaten[doneKey(day, key, meal)]) : '')+
@@ -2087,6 +2207,7 @@ function renderDayDetail(byDay){
     '<div class="day-detail-head"><h3>'+DAY_FULL[day]+'</h3>'+
     '<button type="button" class="btn secondary" data-close-day>Close</button></div>'+
     wakeLine(events.slice().sort(function(a,b){ return a.startMin-b.startMin; }))+
+    breakBanner(dateText)+
     examLines(examsOn(dateText))+
     (soon ? '<p class="study-first-note">'+escapeHtml(soon.exam.name)+' '+
       (soon.days===0 ? 'is today' : 'in '+soon.days+' day'+(soon.days>1?'s':''))+' \u2014 Study ideas are listed first.</p>' : '')+
@@ -2532,11 +2653,14 @@ function startFresh(){
   state.mealPicks = {}; state.activityPicks = {}; state.weekPicks = {}; state.activityDone = {};
   state.customIdeas = {}; state.mealEaten = {}; state.exams = []; state.weekChanges = {}; state.changeFormFor = null;
   state.oneTimeEvents = []; state.oneTimeFormOpen = false; state.sleepLog = {}; state.energyLog = {};
+  state.breaks = []; state.breakFormOpen = false;
   state.expandedGaps = {}; state.selectedDay = null; state.customFormGap = null;
   saveCommitments();
   [PICKS_KEY, ACTIVITY_PICKS_KEY, WEEK_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY, MEAL_EATEN_KEY, WEEK_CHANGES_KEY, SLEEP_LOG_KEY, ENERGY_LOG_KEY].forEach(function(key){ savePickMap(key, {}); });
   saveExams();
   saveOneTimeEvents();
+  saveBreaks();
+  renderBreaks();
   startFreshConfirming = false;
   startFreshMessage = {text:"Cleared.", count:0};
   renderCommitList(); renderExamList(); renderSchedule();
@@ -2551,7 +2675,7 @@ var MAX_PLAN_TEXT = 500000;
 // Saved without the test copy's prefix, so a plan moves between the test and main copies too.
 function planStorageKeys(){
   return [STORAGE_KEY, PROFILE_KEY, PICKS_KEY, ACTIVITY_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY,
-    SEASON_KEY, MEAL_EATEN_KEY, EXAMS_KEY, WEEK_CHANGES_KEY, ONE_TIME_KEY, WEEK_PICKS_KEY, SLEEP_KEY, SLEEP_LOG_KEY, ENERGY_LOG_KEY];
+    SEASON_KEY, MEAL_EATEN_KEY, EXAMS_KEY, WEEK_CHANGES_KEY, ONE_TIME_KEY, WEEK_PICKS_KEY, SLEEP_KEY, SLEEP_LOG_KEY, ENERGY_LOG_KEY, BREAKS_KEY];
 }
 function planKeyName(storageKey){ return storageKey.slice(STORAGE_PREFIX.length); }
 
@@ -2628,10 +2752,10 @@ function usePastedPlan(){
   }
   loadSavedPlan();
   state.selectedDay = null; state.changeFormFor = null; state.customFormGap = null; state.expandedGaps = {};
-  state.oneTimeFormOpen = false;
+  state.oneTimeFormOpen = false; state.breakFormOpen = false;
   movePlan = {mode:"done", commitments:movePlan.commitments, exams:movePlan.exams};
   startFreshMessage = {text:"", count:-1};
-  renderCommitList(); renderExamList(); renderProfileInputs(); renderSchedule(); renderMovePlan();
+  renderCommitList(); renderExamList(); renderBreaks(); renderProfileInputs(); renderSchedule(); renderMovePlan();
 }
 
 function renderMovePlan(){
@@ -3210,6 +3334,7 @@ function loadSavedPlan(){
   loadSleep();
   loadSleepLog();
   loadEnergyLog();
+  loadBreaks();
 }
 
 function init(){
@@ -3219,6 +3344,7 @@ function init(){
   renderSchedule();
   renderCommitList();
   renderExamList();
+  renderBreaks();
   renderMovePlan();
   renderDirectory();
   buildFuelDaySelector();
@@ -3309,6 +3435,16 @@ function init(){
     if(form && ev.key==="Enter" && ev.target.tagName==="INPUT"){ ev.preventDefault(); saveCustomIdea(form); }
     var oneTimeFormEl = ev.target.closest(".one-time-form");
     if(oneTimeFormEl && ev.key==="Enter" && ev.target.tagName==="INPUT"){ ev.preventDefault(); saveOneTimeEvent(oneTimeFormEl, state.selectedDay); }
+  });
+  document.getElementById("breaks").addEventListener("click", function(ev){
+    if(ev.target.closest("[data-break-open]")){
+      state.breakFormOpen = true; renderBreaks();
+      document.querySelector("#breaks [data-break-name]").focus();
+    }
+    if(ev.target.closest("[data-break-cancel]")){ state.breakFormOpen = false; renderBreaks(); }
+    if(ev.target.closest("[data-break-save]")) saveBreak(ev.target.closest(".break-form"));
+    var removeBtn = ev.target.closest("[data-break-remove]");
+    if(removeBtn) removeBreak(removeBtn.dataset.breakRemove);
   });
   document.getElementById("movePlan").addEventListener("click", function(ev){
     if(ev.target.closest("[data-copy-plan]")) copyPlan();
