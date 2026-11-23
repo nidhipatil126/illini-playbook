@@ -598,6 +598,10 @@ details.acc .acc-body{padding:14px 16px;}
 .sleep-dots .dot.late{background:var(--orange);border-color:var(--orange);}
 .sleep-dots .dot.overslept{background:var(--danger);border-color:var(--danger);}
 .sleep-dots .dot.future{border-style:dashed;opacity:.4;}
+.sleep-dots .dot.wiped{background:var(--ink-soft);border-color:var(--ink-soft);}
+.sleep-dots .dot.okay{background:#E5B53A;border-color:#E5B53A;}
+.sleep-dots .dot.fresh{background:var(--turf);border-color:var(--turf);}
+.dots-label{font-size:12.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--ink-soft);margin:0 0 4px;}
 .sleep-key{font-size:12.5px;color:var(--ink-soft);margin:0 0 24px;}
 .recap-note{margin:8px 0 0;font-size:13.5px;color:var(--ink-soft);}
 @media (max-width:560px){ .recap-stats{grid-template-columns:1fr;} }
@@ -995,6 +999,7 @@ var ONE_TIME_KEY = STORAGE_PREFIX + "illini-playbook-one-time-v1";
 var WEEK_PICKS_KEY = STORAGE_PREFIX + "illini-playbook-week-picks-v1";
 var SLEEP_KEY = STORAGE_PREFIX + "illini-playbook-sleep-v1";
 var SLEEP_LOG_KEY = STORAGE_PREFIX + "illini-playbook-sleep-log-v1";
+var ENERGY_LOG_KEY = STORAGE_PREFIX + "illini-playbook-energy-log-v1";
 if (IS_TEST_COPY) {
   var testBanner = document.createElement("p");
   testBanner.className = "test-copy-banner";
@@ -1044,7 +1049,8 @@ var state = {
   oneTimeFormOpen: false, // whether the open day's "Add one-time event" form is showing
   sleep: {hours:8, readyMin:60}, // sleep goal and time to get ready before the first commitment
   sleepFormOpen: false,  // whether Next up's sleep settings are showing
-  sleepLog: {}           // morning date ("2026-11-23") -> "ontime" | "late" | "overslept"
+  sleepLog: {},          // morning date ("2026-11-23") -> "ontime" | "late" | "overslept"
+  energyLog: {}          // date -> "wiped" | "okay" | "fresh", from the check-in after training
 };
 
 // A sample athlete week, shown on a first visit and by "Load the sample week".
@@ -2044,6 +2050,8 @@ function renderDayDetail(byDay){
       var pickMeUps = slumpIdeas(g.end-g.start, classifyGap(g, events).kind);
       ideas = pickMeUps.concat(ideas.filter(function(i){ return pickMeUps.indexOf(i)<0; }));
     }
+    var energy = energyForGap(dateText, g);
+    if(energy) ideas = energyOrder(ideas, energy);
     // Before an exam, studying still comes first, even in the energy dip.
     if(soon) ideas = examsInWindow(dateText).map(function(x){ return examStudyIdea(key, x.exam.id); }).concat(studyFirst(ideas));
     var custom = state.customIdeas[key];
@@ -2057,6 +2065,7 @@ function renderDayDetail(byDay){
       '<div class="swatch"></div>'+
       '<div class="what">Free \u00b7 '+lengthText(g.end-g.start)+' <small>'+classifyGap(g, events).label+' window</small>'+
         (slump ? '<div class="slump-note">Energy dip \u2014 pick-me-ups first</div>' : '')+
+        (energy ? '<div class="slump-note">'+ENERGY_NOTES[energy]+'</div>' : '')+
         (meal ? mealLine(key, meal, state.mealEaten[doneKey(day, key, meal)]) : '')+
         '<select class="idea-select'+(picked?' is-picked':'')+'" data-idea-gap="'+escapeAttr(key)+'" aria-label="Something to do '+minToClock(g.start)+' to '+minToClock(g.end)+'">'+
           '<option value="">Pick something to do\u2026</option>'+
@@ -2279,6 +2288,7 @@ function nextUpLines(byDay, now){
   }
   if(minute >= SLEEP_REMINDER_FROM_MIN) lines.push(sleepLine(byDay, day, minute));
   if(minute < SLEEP_ASK_UNTIL_MIN) lines.push(sleepCheckIn(now));
+  if(shouldAskEnergy(events, minute)) lines.push(energyCheckIn(now));
   return {day:day, html:lines.join("")};
 }
 
@@ -2373,34 +2383,92 @@ function sleepCheckIn(now){
     }).join("")+'</span></p>';
 }
 
-// This week's check-ins, Monday to Sunday; days after today are "future".
-function sleepWeek(){
+/* Energy check-in: after training (or from noon on a day without it), Next up asks how you feel.
+   For the rest of that day, Wiped puts rest and recovery ideas first and Fresh puts study first. */
+var ENERGY_RESULTS = {wiped:"Wiped", okay:"Okay", fresh:"Fresh"};
+var ENERGY_ASK_NO_TRAINING_FROM_MIN = 12*60;
+var ENERGY_GROUP_ORDER = {wiped:["rest", "recover", "study"], fresh:["study", "recover", "rest"]};
+var ENERGY_NOTES = {wiped:"You\u2019re wiped \u2014 rest first", fresh:"You\u2019re fresh \u2014 study first"};
+
+function loadEnergyLog(){
+  var saved = loadPickMap(ENERGY_LOG_KEY);
+  state.energyLog = {};
+  Object.keys(saved).forEach(function(date){ if(isDateText(date) && ENERGY_RESULTS[saved[date]]) state.energyLog[date] = saved[date]; });
+}
+
+function setEnergyResult(date, result){
+  if(state.energyLog[date]===result) delete state.energyLog[date];
+  else state.energyLog[date] = result;
+  savePickMap(ENERGY_LOG_KEY, state.energyLog);
+  renderSchedule();
+}
+
+function shouldAskEnergy(events, minute){
+  var training = events.filter(function(e){ return isTraining(e.ref.type); });
+  if(!training.length) return minute >= ENERGY_ASK_NO_TRAINING_FROM_MIN;
+  return training.some(function(e){ return e.endMin <= minute; });
+}
+
+function energyCheckIn(now){
+  var date = dateTextOf(now);
+  var answer = state.energyLog[date];
+  return '<p class="sleep-line"><b>'+(answer ? 'Feeling:' : 'How do you feel?')+'</b></p>'+
+    '<p class="sub"><span class="repeat-switch" role="group" aria-label="How do you feel">'+
+    Object.keys(ENERGY_RESULTS).map(function(result){
+      return '<button type="button" data-energy-result="'+result+'" data-energy-date="'+date+'" aria-pressed="'+(answer===result)+'">'+ENERGY_RESULTS[result]+'</button>';
+    }).join("")+'</span></p>';
+}
+
+// Today's energy, if this gap is on today and hasn't ended yet; otherwise null.
+function energyForGap(dateText, gap){
+  var now = clockNow();
+  if(dateText!==dateTextOf(now) || gap.end <= now.getHours()*60+now.getMinutes()) return null;
+  var energy = state.energyLog[dateText];
+  return ENERGY_GROUP_ORDER[energy] ? energy : null;
+}
+
+// Keeps each group's ideas in their order, with groups in the energy's order.
+function energyOrder(ideas, energy){
+  var order = ENERGY_GROUP_ORDER[energy];
+  return ideas.map(function(idea, i){ return {idea:idea, i:i}; }).sort(function(a, b){
+    return order.indexOf(a.idea.group)-order.indexOf(b.idea.group) || a.i-b.i;
+  }).map(function(x){ return x.idea; });
+}
+
+// One dot per day this week, Monday to Sunday; days after today are "future".
+function weekDots(log, results){
   var today = dateTextOf(clockNow());
   return DAYS.map(function(d){
     var date = dateOfThisWeek(d);
-    return {day:d, result: state.sleepLog[date] || null, future: date > today};
-  });
+    var result = log[date] || null;
+    var future = date > today;
+    var label = result ? results[result] : (future ? "Not yet" : "No check-in");
+    return '<li><span class="dot'+(result ? ' '+result : '')+(future ? ' future' : '')+'" title="'+label+'" aria-label="'+DAY_FULL[d]+': '+label+'"></span>'+d+'</li>';
+  }).join("");
+}
+
+function loggedThisWeek(log){
+  return DAYS.map(function(d){ return log[dateOfThisWeek(d)]; }).filter(Boolean);
 }
 
 function renderSleepRecap(){
-  var week = sleepWeek();
-  var logged = week.filter(function(n){ return n.result; });
-  var count = function(result){ return logged.filter(function(n){ return n.result===result; }).length; };
   var el = document.getElementById("recapSleep");
-  if(!logged.length){
-    el.innerHTML = '<p class="recap-note" style="margin-bottom:24px">No sleep check-ins this week yet. Each morning until noon, Next up asks how you slept.</p>';
+  var sleeps = loggedThisWeek(state.sleepLog), energies = loggedThisWeek(state.energyLog);
+  if(!sleeps.length && !energies.length){
+    el.innerHTML = '<p class="recap-note" style="margin-bottom:24px">No check-ins this week yet. Each morning until noon, Next up asks how you slept, and after training it asks how you feel.</p>';
     return;
   }
+  var count = function(list, result){ return list.filter(function(r){ return r===result; }).length; };
   var tips = [];
-  if(count("overslept") >= SLEEP_TIP_AT) tips.push("You overslept "+count("overslept")+" times. Try putting your alarm across the room, or a bedtime 30 minutes earlier.");
-  if(count("late") >= SLEEP_TIP_AT) tips.push("Late to bed "+count("late")+" times. Next up shows your bedtime from 6 PM \u2014 try starting to wind down when it appears.");
-  el.innerHTML = '<p class="sleep-count"><b>'+count("ontime")+' of '+countText(logged.length, "night")+' on time</b></p>'+
-    '<ul class="sleep-dots">'+week.map(function(n){
-      var label = n.result ? SLEEP_RESULTS[n.result] : (n.future ? "Not yet" : "No check-in");
-      return '<li><span class="dot'+(n.result ? ' '+n.result : '')+(n.future ? ' future' : '')+'" title="'+label+'" aria-label="'+DAY_FULL[n.day]+': '+label+'"></span>'+n.day+'</li>';
-    }).join("")+'</ul>'+
+  if(count(sleeps, "overslept") >= SLEEP_TIP_AT) tips.push("You overslept "+count(sleeps, "overslept")+" times. Try putting your alarm across the room, or a bedtime 30 minutes earlier.");
+  if(count(sleeps, "late") >= SLEEP_TIP_AT) tips.push("Late to bed "+count(sleeps, "late")+" times. Next up shows your bedtime from 6 PM \u2014 try starting to wind down when it appears.");
+  if(count(energies, "wiped") >= SLEEP_TIP_AT) tips.push("Wiped "+count(energies, "wiped")+" days. Compare with your sleep dots above \u2014 a short nap in the afternoon dip can help.");
+  el.innerHTML =
+    (sleeps.length ? '<p class="sleep-count"><b>'+count(sleeps, "ontime")+' of '+countText(sleeps.length, "night")+' on time</b></p>' : '')+
+    '<p class="dots-label">Sleep</p><ul class="sleep-dots">'+weekDots(state.sleepLog, SLEEP_RESULTS)+'</ul>'+
+    '<p class="dots-label">Energy</p><ul class="sleep-dots">'+weekDots(state.energyLog, ENERGY_RESULTS)+'</ul>'+
     (tips.length ? '<ul class="recap-tips" style="margin-bottom:8px">'+tips.map(function(t){ return '<li>'+escapeHtml(t)+'</li>'; }).join("")+'</ul>' : '')+
-    '<p class="sleep-key">Green: on time \u00b7 Orange: late to bed \u00b7 Red: overslept \u00b7 Empty: no check-in</p>';
+    '<p class="sleep-key">Sleep: green on time \u00b7 orange late to bed \u00b7 red overslept. Energy: green fresh \u00b7 yellow okay \u00b7 gray wiped. Empty: no check-in.</p>';
 }
 
 function wakeLine(events){
@@ -2463,10 +2531,10 @@ function startFresh(){
   state.commitments = [];
   state.mealPicks = {}; state.activityPicks = {}; state.weekPicks = {}; state.activityDone = {};
   state.customIdeas = {}; state.mealEaten = {}; state.exams = []; state.weekChanges = {}; state.changeFormFor = null;
-  state.oneTimeEvents = []; state.oneTimeFormOpen = false; state.sleepLog = {};
+  state.oneTimeEvents = []; state.oneTimeFormOpen = false; state.sleepLog = {}; state.energyLog = {};
   state.expandedGaps = {}; state.selectedDay = null; state.customFormGap = null;
   saveCommitments();
-  [PICKS_KEY, ACTIVITY_PICKS_KEY, WEEK_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY, MEAL_EATEN_KEY, WEEK_CHANGES_KEY, SLEEP_LOG_KEY].forEach(function(key){ savePickMap(key, {}); });
+  [PICKS_KEY, ACTIVITY_PICKS_KEY, WEEK_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY, MEAL_EATEN_KEY, WEEK_CHANGES_KEY, SLEEP_LOG_KEY, ENERGY_LOG_KEY].forEach(function(key){ savePickMap(key, {}); });
   saveExams();
   saveOneTimeEvents();
   startFreshConfirming = false;
@@ -2483,7 +2551,7 @@ var MAX_PLAN_TEXT = 500000;
 // Saved without the test copy's prefix, so a plan moves between the test and main copies too.
 function planStorageKeys(){
   return [STORAGE_KEY, PROFILE_KEY, PICKS_KEY, ACTIVITY_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY,
-    SEASON_KEY, MEAL_EATEN_KEY, EXAMS_KEY, WEEK_CHANGES_KEY, ONE_TIME_KEY, WEEK_PICKS_KEY, SLEEP_KEY, SLEEP_LOG_KEY];
+    SEASON_KEY, MEAL_EATEN_KEY, EXAMS_KEY, WEEK_CHANGES_KEY, ONE_TIME_KEY, WEEK_PICKS_KEY, SLEEP_KEY, SLEEP_LOG_KEY, ENERGY_LOG_KEY];
 }
 function planKeyName(storageKey){ return storageKey.slice(STORAGE_PREFIX.length); }
 
@@ -3138,6 +3206,7 @@ function loadSavedPlan(){
   loadOneTimeEvents();
   loadSleep();
   loadSleepLog();
+  loadEnergyLog();
 }
 
 function init(){
@@ -3169,6 +3238,8 @@ function init(){
     if(ev.target.closest("[data-sleep-done]")){ state.sleepFormOpen = false; renderSchedule(); }
     var sleepResultBtn = ev.target.closest("[data-sleep-result]");
     if(sleepResultBtn) setSleepResult(sleepResultBtn.dataset.sleepDate, sleepResultBtn.dataset.sleepResult);
+    var energyResultBtn = ev.target.closest("[data-energy-result]");
+    if(energyResultBtn) setEnergyResult(energyResultBtn.dataset.energyDate, energyResultBtn.dataset.energyResult);
   });
   document.getElementById("nextUp").addEventListener("change", function(ev){
     if(ev.target.matches("[data-sleep-hours]")) state.sleep.hours = Number(ev.target.value);
