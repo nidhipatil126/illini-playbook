@@ -234,6 +234,15 @@ p.section-sub{margin:0 0 18px;color:var(--ink-soft);font-size:14px;font-weight:6
 .game-fuel li.is-game{font-weight:700;}
 .game-fuel small{display:block;color:var(--ink-soft);font-size:12px;font-weight:400;}
 .travel-card{border-color:var(--navy);}
+/* Week ahead: a This week / Next week switch over the day tiles, and next week's highlights. */
+.week-switch{margin:0 0 12px;}
+.week-switch .repeat-switch button{font-size:14px;padding:6px 14px;}
+.week-ahead{border:2px solid var(--navy);background:var(--surface);padding:10px 14px;margin:0 0 14px;}
+.week-ahead h4{margin:0 0 6px;font-size:15px;font-weight:700;}
+.week-ahead ul{margin:0;padding:0;list-style:none;}
+.week-ahead li{padding:3px 0;font-size:14px;border-top:1px solid var(--line);}
+.week-ahead li:first-child{border-top:none;}
+.ahead-note{margin:10px 0 0;font-size:13px;color:var(--ink-soft);}
 .idea-select{display:block;width:100%;max-width:320px;margin-top:6px;font:inherit;font-size:13.5px;font-weight:600;
   padding:6px 8px;color:var(--ink);background:var(--surface);border:2px solid var(--ink);cursor:pointer;}
 .custom-form{margin-top:8px;padding:10px 12px;border:1.5px solid var(--line);background:var(--surface);max-width:320px;color:var(--ink);}
@@ -665,6 +674,8 @@ footer.foot{
 
     <div id="installTip"></div>
     <div id="nextUp"></div>
+    <div id="weekSwitch"></div>
+    <div id="weekAhead"></div>
     <div class="snapshot" id="snapshot"></div>
     <div id="dayDetail"></div>
 
@@ -1062,6 +1073,7 @@ var state = {
   oneTimeFormOpen: false, // whether the open day's "Add one-time event" form is showing
   breaks: [],           // {id, name, from, to}: date ranges when classes and study hall pause
   breakFormOpen: false, // whether the Breaks card's "Add break" form is showing
+  weekAhead: false,     // true while Schedule shows next week (view only)
   sleep: {hours:8, readyMin:60}, // sleep goal and time to get ready before the first commitment
   sleepFormOpen: false,  // whether Next up's sleep settings are showing
   sleepLog: {},          // morning date ("2026-11-23") -> "ontime" | "late" | "overslept"
@@ -1440,14 +1452,14 @@ function minToHHMM(min){
   return pad(Math.floor(min/60))+":"+pad(min%60);
 }
 
-function renderSnapshot(byDay){
+function renderSnapshot(byDay, weeksBack){
   var el = document.getElementById("snapshot");
   var totals = DAYS.map(function(d){
     return byDay[d].reduce(function(sum,e){ return sum + (e.endMin-e.startMin); },0);
   });
   var max = Math.max.apply(null, totals.concat([1]));
   var busiestIdx = totals.indexOf(max);
-  var today = todayName();
+  var today = weeksBack ? null : todayName();
   el.innerHTML = DAYS.map(function(d,i){
     var h = totals[i]/60;
     var barH = Math.max(4, (totals[i]/max)*56);
@@ -1456,8 +1468,8 @@ function renderSnapshot(byDay){
       : '<div class="bar" style="height:'+barH.toFixed(0)+'px"></div>';
     var tags = (d===today ? '<span class="today-tag">Today</span>' : '')+
       (i===busiestIdx && max>0 ? '<span class="busy-tag">Busiest</span>' : '')+
-      examTag(examsOn(dateOfThisWeek(d)))+
-      (breakOn(dateOfThisWeek(d)) ? '<span class="break-tag">Break</span>' : '');
+      examTag(examsOn(dateOfThisWeek(d, weeksBack)))+
+      (breakOn(dateOfThisWeek(d, weeksBack)) ? '<span class="break-tag">Break</span>' : '');
     var classes = "snap-day"+(i===busiestIdx && max>0 ? " busiest":"")+(state.selectedDay===d ? " selected":"");
     return '<button type="button" class="'+classes+'" data-day="'+d+'" aria-expanded="'+(state.selectedDay===d)+'" aria-controls="dayDetail">'+
       (tags ? '<span class="tile-tags">'+tags+'</span>' : '')+
@@ -2151,16 +2163,18 @@ function renderRecap(){
 // "Plan Tue" on a suggestion: open Schedule with that day's panel showing.
 function planDay(day){
   state.selectedDay = day;
+  state.weekAhead = false;
   showTab("schedule");
   document.getElementById("dayDetail").scrollIntoView({behavior:"smooth", block:"start"});
 }
 
 // Lists the open day's commitments and the free gaps between them, in time order.
-function renderDayDetail(byDay){
+function renderDayDetail(byDay, weeksBack){
   var el = document.getElementById("dayDetail");
   var day = state.selectedDay;
   if(!day){ el.innerHTML = ""; return; }
   var events = byDay[day];
+  if(weeksBack){ el.innerHTML = aheadDayDetail(day, events, dateOfThisWeek(day, weeksBack)); return; }
   var dateText = dateOfThisWeek(day);
   var soon = upcomingExam(dateText);
   var skipped = skippedOn(day);
@@ -2254,6 +2268,35 @@ function renderDayDetail(byDay){
     '</div>';
 }
 
+// Next week's day panel: what's on and the free gaps, without picks or changes.
+function aheadDayDetail(day, events, dateText){
+  var sorted = events.slice().sort(function(a,b){ return a.startMin-b.startMin; });
+  var rows = sorted.map(function(e){
+    var meta = TYPE_META[e.ref.type] || TYPE_META.other;
+    return {start:e.startMin, html:'<div class="day-detail-row">'+
+      '<div class="time">'+minToClock(e.startMin)+'–'+minToClock(e.endMin)+'</div>'+
+      '<div class="swatch '+meta.cls+'"></div>'+
+      '<div class="what"><b>'+escapeHtml(e.ref.title)+'</b><small>'+meta.label+(e.ref.loc?' · '+escapeHtml(e.ref.loc):'')+'</small></div>'+
+      '</div>'};
+  }).concat(findGaps(events).map(function(g){
+    return {start:g.start, html:'<div class="day-detail-row free">'+
+      '<div class="time">'+minToClock(g.start)+'–'+minToClock(g.end)+'</div>'+
+      '<div class="swatch"></div>'+
+      '<div class="what">Free · '+lengthText(g.end-g.start)+' <small>'+classifyGap(g, events).label+' window</small></div>'+
+      '</div>'};
+  })).sort(function(a,b){ return a.start-b.start; });
+  return '<div class="day-detail" role="region" aria-label="'+DAY_FULL[day]+' next week">'+
+    '<div class="day-detail-head"><h3>'+DAY_FULL[day]+', '+shortDate(dateText).replace(/^\w+, /, "")+'</h3>'+
+    '<button type="button" class="btn secondary" data-close-day>Close</button></div>'+
+    wakeLine(sorted, dateText)+
+    breakBanner(dateText)+
+    examLines(examsOn(dateText))+
+    gameFuelCard(events)+travelCard(events)+
+    (events.length ? rows.map(function(r){ return r.html; }).join("") : '<p class="empty-note">Free day — nothing scheduled.</p>')+
+    '<p class="ahead-note">Next week is a look ahead. Pick ideas for these gaps once the week starts.</p>'+
+    '</div>';
+}
+
 // Game-day fuel: a full meal 3-4 hours before the first game of the day,
 // water about 2 hours before, a small snack about 1 hour before, then water after.
 var GAME_MEAL_EARLIEST_MIN = 4*60, GAME_MEAL_LATEST_MIN = 3*60;
@@ -2335,7 +2378,7 @@ function renderConflictBanner(byDay){
     });
   });
   if(lines.length===0){ el.innerHTML=""; return; }
-  el.innerHTML = '<div class="conflict-banner"><span style="font-size:20px;">\u26A0\uFE0F</span><div><strong>'+lines.length+' scheduling conflict'+(lines.length>1?'s':'')+' this week</strong><ul>'+
+  el.innerHTML = '<div class="conflict-banner"><span style="font-size:20px;">\u26A0\uFE0F</span><div><strong>'+lines.length+' scheduling conflict'+(lines.length>1?'s':'')+(state.weekAhead?' next week':' this week')+'</strong><ul>'+
     lines.map(function(l){ return '<li>'+l+'</li>'; }).join("") +
     '</ul></div></div>';
 }
@@ -2650,13 +2693,76 @@ function renderNextUp(byDay){
     '<h3>Next up \u00b7 '+result.day+' '+minToClock(now.getHours()*60+now.getMinutes())+'</h3>'+result.html+'</div>';
 }
 
+// Next up is always about today; the tiles, day panel and grid follow the This week / Next week switch.
 function renderSchedule(){
-  var byDay = expandByDay();
-  renderNextUp(byDay);
-  renderSnapshot(byDay);
-  renderDayDetail(byDay);
+  var weeksBack = state.weekAhead ? -1 : 0;
+  var byDay = expandByDay(weeksBack);
+  renderNextUp(state.weekAhead ? expandByDay() : byDay);
+  renderWeekSwitch();
+  renderWeekAhead(byDay);
+  renderSnapshot(byDay, weeksBack);
+  renderDayDetail(byDay, weeksBack);
   renderConflictBanner(byDay);
   renderGrid(byDay);
+}
+
+/* Week ahead: next week's schedule, with breaks, travel and exams, to look at before it starts.
+   Picks and check-offs stay on this week. */
+function renderWeekSwitch(){
+  document.getElementById("weekSwitch").innerHTML = '<div class="week-switch"><span class="repeat-switch" role="group" aria-label="Which week">'+
+    '<button type="button" data-week-ahead="no" aria-pressed="'+!state.weekAhead+'">This week</button>'+
+    '<button type="button" data-week-ahead="yes" aria-pressed="'+state.weekAhead+'">Next week</button></span></div>';
+}
+
+function setWeekAhead(on){
+  if(state.weekAhead===on) return;
+  state.weekAhead = on;
+  state.changeFormFor = null; state.oneTimeFormOpen = false; state.customFormGap = null;
+  renderSchedule();
+}
+
+// Next week's highlights: busiest day, earliest start, exams, breaks and travel.
+function weekAheadLines(byDay){
+  var lines = [];
+  var totals = DAYS.map(function(d){ return byDay[d].reduce(function(sum, e){ return sum + (e.endMin-e.startMin); }, 0); });
+  var max = Math.max.apply(null, totals);
+  if(max > 0){
+    var busiest = DAYS[totals.indexOf(max)];
+    lines.push('<b>Busiest:</b> '+DAY_FULL[busiest]+' \u00b7 '+lengthText(max)+' scheduled');
+  }
+  var earliest = null;
+  DAYS.forEach(function(d){
+    byDay[d].forEach(function(e){ if(!earliest || e.startMin < earliest.event.startMin) earliest = {day:d, event:e}; });
+  });
+  if(earliest){
+    var plan = sleepPlan(byDay[earliest.day].slice().sort(function(a,b){ return a.startMin-b.startMin; }), dateOfThisWeek(earliest.day, -1));
+    lines.push('<b>Earliest start:</b> '+DAY_FULL[earliest.day]+' '+minToClock(earliest.event.startMin)+' \u00b7 '+escapeHtml(earliest.event.ref.title)+
+      ' \u2014 wake by '+clockAt(plan.wakeMin));
+  }
+  var from = dateOfThisWeek("Mon", -1), to = dateOfThisWeek("Sun", -1);
+  state.exams.filter(function(x){ return x.date >= from && x.date <= to; })
+    .sort(function(a,b){ return a.date<b.date ? -1 : a.date>b.date ? 1 : 0; })
+    .forEach(function(x){ lines.push('<b>'+EXAM_KINDS[x.kind]+':</b> '+escapeHtml(x.name)+' \u00b7 '+shortDate(x.date)); });
+  state.breaks.filter(function(b){ return b.from <= to && b.to >= from; }).forEach(function(b){
+    lines.push('<b>Break:</b> '+escapeHtml(b.name)+' \u00b7 '+breakRangeText(b));
+  });
+  DAYS.forEach(function(d){
+    byDay[d].filter(function(e){ return e.ref.type==="travel"; }).forEach(function(e){
+      lines.push('<b>Travel:</b> '+escapeHtml(e.ref.title)+' \u00b7 '+DAY_FULL[d]+' '+minToClock(e.startMin));
+    });
+  });
+  return lines;
+}
+
+function renderWeekAhead(byDay){
+  var el = document.getElementById("weekAhead");
+  if(!state.weekAhead){ el.innerHTML = ""; return; }
+  var lines = weekAheadLines(byDay);
+  el.innerHTML = '<div class="week-ahead" role="region" aria-label="Next week">'+
+    '<h4>Next week \u00b7 '+shortDate(dateOfThisWeek("Mon", -1))+' \u2013 '+shortDate(dateOfThisWeek("Sun", -1))+'</h4>'+
+    (lines.length ? '<ul>'+lines.map(function(l){ return '<li>'+l+'</li>'; }).join("")+'</ul>'
+      : '<p class="empty-note">Nothing scheduled next week yet.</p>')+
+    '</div>';
 }
 
 /* ============================================================
@@ -3423,6 +3529,10 @@ function init(){
   });
   // Skipped while the sleep settings are open, so a menu isn't redrawn while you use it.
   setInterval(function(){ if(!state.sleepFormOpen) renderNextUp(); }, NEXT_UP_REFRESH_MS);
+  document.getElementById("weekSwitch").addEventListener("click", function(ev){
+    var weekBtn = ev.target.closest("[data-week-ahead]");
+    if(weekBtn) setWeekAhead(weekBtn.dataset.weekAhead==="yes");
+  });
   document.getElementById("snapshot").addEventListener("click", function(ev){
     var tile = ev.target.closest("[data-day]");
     if(tile) toggleDay(tile.dataset.day);
