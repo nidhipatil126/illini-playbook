@@ -233,6 +233,7 @@ p.section-sub{margin:0 0 18px;color:var(--ink-soft);font-size:14px;font-weight:6
 .game-fuel .time{flex:none;width:122px;color:var(--ink-soft);font-weight:600;font-size:13px;white-space:nowrap;}
 .game-fuel li.is-game{font-weight:700;}
 .game-fuel small{display:block;color:var(--ink-soft);font-size:12px;font-weight:400;}
+.travel-card{border-color:var(--navy);}
 .idea-select{display:block;width:100%;max-width:320px;margin-top:6px;font:inherit;font-size:13.5px;font-weight:600;
   padding:6px 8px;color:var(--ink);background:var(--surface);border:2px solid var(--ink);cursor:pointer;}
 .custom-form{margin-top:8px;padding:10px 12px;border:1.5px solid var(--line);background:var(--surface);max-width:320px;color:var(--ink);}
@@ -1486,6 +1487,11 @@ var ACTIVITY_IDEAS = [
   {name:"Career fair prep", minutes:90, group:"study", career:true},
   // Only offered on break days (see breakIdeas).
   {name:"Work on a side project", minutes:60, group:"study", career:true, when:"break"},
+  // Only offered right before or after travel (see travelIdeas).
+  {name:"Pack a snack bag", minutes:15, group:"recover", when:"beforeTravel"},
+  {name:"Fill water bottles", minutes:5, group:"recover", when:"beforeTravel"},
+  {name:"Real meal after travel", minutes:30, group:"recover", when:"afterTravel"},
+  {name:"Walk + stretch", minutes:10, group:"rest", when:"afterTravel"},
   {name:"Quiet time, phone away", minutes:15, group:"rest"},
   {name:"20-min nap (set a timer)", minutes:20, group:"rest", when:"notAfter"},
   {name:"Music or podcast break", minutes:20, group:"rest"},
@@ -1495,6 +1501,8 @@ var ACTIVITY_IDEAS = [
   {name:"Cold water + stretch", minutes:5, group:"recover", when:"slump"}
 ];
 var IDEA_GROUPS = ["recover", "study", "rest"];
+// Ideas only offered on break days or around travel, never in the usual per-group picks.
+var ONLY_WHEN = ["break", "beforeTravel", "afterTravel"];
 var IDEA_GROUP_NAMES = {recover:"Recover", study:"Study", rest:"Rest"};
 
 // For each group, the best idea that fits the gap: after training, recovery-only ideas first; otherwise the longest.
@@ -1505,7 +1513,7 @@ function ideasFor(gapMinutes, gapKind){
       if(idea.group!==group || idea.minutes > gapMinutes) return false;
       if(idea.when==="after") return afterTraining;
       if(idea.when==="notAfter") return !afterTraining;
-      return idea.when!=="break";
+      return ONLY_WHEN.indexOf(idea.when) < 0;
     }).sort(function(a,b){ return (b.when==="after")-(a.when==="after") || b.minutes-a.minutes; })[0];
   }).filter(Boolean);
 }
@@ -1519,6 +1527,32 @@ function breakIdeas(ideas, gapMinutes){
   var swapped = ideas.map(function(idea){ return idea.group==="study" && career ? career : idea; });
   if(career && !swapped.some(function(i){ return i===career; })) swapped.push(career);
   return swapped.sort(function(a,b){ return BREAK_GROUP_ORDER.indexOf(a.group)-BREAK_GROUP_ORDER.indexOf(b.group); });
+}
+
+/* Travel days: the gap right before a Travel event lists packing ideas first, and the gap right
+   after it lists a real meal and a walk first. The day panel also shows a short travel checklist. */
+var TRAVEL_NOTES = {beforeTravel:"Travel next — pack first", afterTravel:"Back from travel — eat first"};
+
+// "beforeTravel" when a travel event starts as this gap ends, "afterTravel" when one ends as it starts, else null.
+function travelSide(gap, events){
+  var travel = events.filter(function(e){ return e.ref.type==="travel"; });
+  if(travel.some(function(e){ return e.startMin===gap.end; })) return "beforeTravel";
+  if(travel.some(function(e){ return e.endMin===gap.start; })) return "afterTravel";
+  return null;
+}
+
+function travelIdeas(ideas, side, gapMinutes){
+  var first = ACTIVITY_IDEAS.filter(function(idea){ return idea.when===side && idea.minutes <= gapMinutes; });
+  return first.concat(ideas.filter(function(i){ return first.indexOf(i)<0; }));
+}
+
+function travelCard(events){
+  if(!events.some(function(e){ return e.ref.type==="travel"; })) return "";
+  return '<div class="game-fuel travel-card" aria-label="Travel checklist"><h4>Travel day</h4><ol>'+
+    '<li><span>Pack snacks<small>Fruit, granola bars, a PB sandwich</small></span></li>'+
+    '<li><span>Two full water bottles<small>Sip the whole way</small></span></li>'+
+    '<li><span>Eat a real meal within 2h of arriving<small>Carbs + protein to recover from sitting</small></span></li>'+
+    '</ol></div>';
 }
 
 /* Afternoon energy dip: a gap that overlaps 1-4 PM lists pick-me-ups first. */
@@ -2171,6 +2205,8 @@ function renderDayDetail(byDay){
     }
     var energy = energyForGap(dateText, g);
     if(energy) ideas = energyOrder(ideas, energy);
+    var travel = travelSide(g, events);
+    if(travel) ideas = travelIdeas(ideas, travel, g.end-g.start);
     // Before an exam, studying still comes first, even in the energy dip.
     if(soon) ideas = examsInWindow(dateText).map(function(x){ return examStudyIdea(key, x.exam.id); }).concat(studyFirst(ideas));
     var custom = state.customIdeas[key];
@@ -2186,6 +2222,7 @@ function renderDayDetail(byDay){
         (onBreak ? '<div class="slump-note">Break day \u2014 rest and side projects first</div>' : '')+
         (slump ? '<div class="slump-note">Energy dip \u2014 pick-me-ups first</div>' : '')+
         (energy ? '<div class="slump-note">'+ENERGY_NOTES[energy]+'</div>' : '')+
+        (travel ? '<div class="slump-note">'+TRAVEL_NOTES[travel]+'</div>' : '')+
         (meal ? mealLine(key, meal, state.mealEaten[doneKey(day, key, meal)]) : '')+
         '<select class="idea-select'+(picked?' is-picked':'')+'" data-idea-gap="'+escapeAttr(key)+'" aria-label="Something to do '+minToClock(g.start)+' to '+minToClock(g.end)+'">'+
           '<option value="">Pick something to do\u2026</option>'+
@@ -2211,7 +2248,7 @@ function renderDayDetail(byDay){
     examLines(examsOn(dateText))+
     (soon ? '<p class="study-first-note">'+escapeHtml(soon.exam.name)+' '+
       (soon.days===0 ? 'is today' : 'in '+soon.days+' day'+(soon.days>1?'s':''))+' \u2014 Study ideas are listed first.</p>' : '')+
-    gameFuelCard(events)+body+
+    gameFuelCard(events)+travelCard(events)+body+
     '<div class="one-time-add">'+(state.oneTimeFormOpen ? oneTimeForm()
       : '<button type="button" class="btn secondary" data-one-time-open>+ Add one-time event</button>')+'</div>'+
     '</div>';
