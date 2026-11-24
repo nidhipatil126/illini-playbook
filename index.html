@@ -668,6 +668,9 @@ details.acc .acc-body{padding:14px 16px;}
 .info-section p,.info-section li{font-size:14.5px;}
 .info-section ol,.info-section ul{padding-left:22px;}
 .info-section li{margin-bottom:6px;}
+.info-section h4{margin:14px 0 4px;font-size:15px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--orange-2);}
+.info-guide h4:first-of-type{margin-top:6px;}
+.info-subhead{font-family:var(--font-display);font-size:22px;font-weight:600;margin:6px 0 10px;}
 .info-formula{display:block;font-family:ui-monospace,Menlo,monospace;font-size:13.5px;background:var(--surface-2);padding:8px 12px;margin:8px 0;overflow-x:auto;}
 
 footer.foot{
@@ -936,8 +939,50 @@ footer.foot{
   <!-- ============ HOW IT WORKS TAB ============ -->
   <section class="tab" id="tab-info">
     <h2 class="section-title">How it works</h2>
-    <p class="section-sub">How the Fuel tab sets your meal goals and picks foods. Ballpark only.</p>
+    <p class="section-sub">What each part of the app does, and how Fuel sets your meal goals. Ballpark only.</p>
     <p><button type="button" class="btn secondary" id="tourReplay">Show the tour again</button></p>
+
+    <div class="info-section info-guide" id="infoGuide">
+      <h3>What you can do</h3>
+      <h4>Schedule</h4>
+      <ul>
+        <li><b>Tap a day tile</b> to open its plan: commitments, free gaps, and something to do in each gap. Pick an idea from the menu and tap <b>Mark done</b> when it’s done, or choose <b>Something else…</b> to type your own.</li>
+        <li>A pick is for <b>Just this week</b> unless you switch it to <b>Every week</b> under the menu.</li>
+        <li><b>Change this week</b> on a commitment skips it or moves its time for this week only. <b>+ Add one-time event</b> adds something to just that day.</li>
+        <li><b>Travel:</b> add a one-time event with the Travel type. The day gets a travel checklist, the gap before it lists packing first, and the gap after it lists a real meal first.</li>
+        <li><b>Breaks</b> (card at the bottom of Schedule): give a name and a first and last day. Classes and study hall pause and training stays. Gaps list rest and career ideas first, and the wake-up is 9 AM unless something starts earlier. On the last day, Next up says classes start tomorrow.</li>
+        <li><b>Next week</b> (switch above the day tiles) shows next week’s days with its busiest day, earliest start, exams, breaks and travel. It’s a look only; pick ideas once the week starts.</li>
+        <li>Gaps between 1 and 4 PM list pick-me-ups first for the afternoon energy dip. From 3 days before an exam or deadline, study ideas come first.</li>
+      </ul>
+      <h4>Next up (top of Schedule)</h4>
+      <ul>
+        <li>What’s happening now, what’s next, and anything planned for the current gap.</li>
+        <li><b>Sleep:</b> until noon it asks how you slept. From 6 PM it shows a bedtime, worked back from tomorrow’s first commitment, your get-ready time and your hours of sleep (tap <b>Change</b> to set them).</li>
+        <li><b>Energy:</b> after training (or from noon without it) it asks how you feel. <b>Wiped</b> puts rest ideas first for the rest of the day; <b>Fresh</b> puts study first.</li>
+        <li><b>Water:</b> tap <b>+</b> for each 16 oz bottle. The goal is 6 on a rest day, 8 with practice or a lift, and 10 on a game or travel day.</li>
+        <li><b>Game days:</b> a countdown to the game with each fuel step: a full meal 3–4 hours before, 16–20 oz of water 2 hours before, a small snack 1 hour before, a warm-up 45 minutes before, and water after. Tap a step to check it off.</li>
+      </ul>
+      <h4>Add</h4>
+      <ul>
+        <li>Your weekly commitments, and exams and deadlines.</li>
+        <li><b>Start fresh</b> clears the week. <b>Move your plan</b> copies everything to another phone, browser or the home screen app.</li>
+      </ul>
+      <h4>Fuel</h4>
+      <ul>
+        <li><b>Grocery list:</b> snacks this week’s games, travel and snack picks need, plus your own items. Checks reset each Monday.</li>
+        <li>Dining hall foods for each meal gap, matched to a goal from your weight and training load (explained below).</li>
+      </ul>
+      <h4>Recap</h4>
+      <ul>
+        <li>This week so far: NCAA countable hours, follow-through on picks, exam prep, Sleep, Energy and Water dots, Game fuel, suggestions, and last week to compare.</li>
+      </ul>
+      <h4>On your phone</h4>
+      <ul>
+        <li>Add it to your Home Screen to open it like an app; it works offline after the first visit.</li>
+      </ul>
+    </div>
+
+    <h3 class="info-subhead">How Fuel sets your meal goals</h3>
 
     <div class="info-section">
       <h3>1. Your goal for each meal</h3>
