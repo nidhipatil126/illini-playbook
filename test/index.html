@@ -2450,6 +2450,8 @@ function nextUpLines(byDay, now){
   var minute = now.getHours()*60 + now.getMinutes();
   var events = byDay[day].slice().sort(function(a,b){ return a.startMin-b.startMin; });
   var lines = [];
+  var backLine = backFromBreakLine(byDay, day, now);
+  if(backLine) lines.push(backLine);
   var current = events.find(function(e){ return e.startMin<=minute && minute<e.endMin; });
   var gap = current ? null : findGaps(events).find(function(g){ return g.start<=minute && minute<g.end; });
 
@@ -2491,6 +2493,24 @@ function nextUpLines(byDay, now){
   if(minute < SLEEP_ASK_UNTIL_MIN) lines.push(sleepCheckIn(now));
   if(shouldAskEnergy(events, minute)) lines.push(energyCheckIn(now));
   return {day:day, html:lines.join("")};
+}
+
+/* Back from break: all of a break's last day, Next up says what tomorrow starts with,
+   so there's time to pack and prep before classes come back. */
+function backFromBreakLine(byDay, day, now){
+  var today = dateTextOf(now);
+  var endsToday = breakOn(today);
+  var tomorrowDate = dateTextOf(new Date(now.getFullYear(), now.getMonth(), now.getDate()+1));
+  if(!endsToday || endsToday.to!==today || breakOn(tomorrowDate)) return "";
+  var tomorrow = DAYS[(DAYS.indexOf(day)+1)%7];
+  var events = eventsOn(tomorrow, byDay, day==="Sun");
+  var firstClass = events.filter(function(e){ return e.ref.type==="class"; })[0];
+  var say = function(e){ return escapeHtml(e.ref.title)+' '+minToClock(e.startMin); };
+  var first = events[0];
+  var what = !first ? 'Tomorrow is free.'
+    : 'First: '+say(first)+(firstClass && firstClass!==first ? ', then '+say(firstClass) : '')+'.';
+  return '<p class="sleep-line"><b>'+escapeHtml(endsToday.name)+' ends today</b> \u2014 '+
+    (firstClass ? 'classes start tomorrow.' : 'back to your usual week tomorrow.')+' '+what+'</p>';
 }
 
 /* Sleep: wake up readyMin before the day's first commitment, and go to bed `hours` before that. */
