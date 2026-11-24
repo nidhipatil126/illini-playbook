@@ -653,6 +653,8 @@ details.acc .acc-body{padding:14px 16px;}
 .sleep-dots .dot.met{background:var(--turf);border-color:var(--turf);}
 .sleep-dots .dot.half{background:#E5B53A;border-color:#E5B53A;}
 .water-done{font-size:13px;font-weight:800;color:var(--turf);}
+.water-line.is-behind{border-left:4px solid var(--orange);padding-left:8px;}
+.water-behind{font-weight:700;color:var(--orange-2);}
 .water-buttons{display:inline-flex;gap:6px;margin-left:4px;}
 .water-buttons .pick-btn{min-width:34px;font-size:16px;}
 .water-buttons .pick-btn:disabled{opacity:.4;cursor:default;}
@@ -2639,7 +2641,7 @@ function nextUpLines(byDay, now){
   }
 
   lines.push(gameCountdown(events, minute, dateTextOf(now)));
-  lines.push(waterLine(events, dateTextOf(now)));
+  lines.push(waterLine(events, dateTextOf(now), minute));
 
   var next = events.find(function(e){ return e.startMin>minute; });
   if(state.commitments.length===0){
@@ -2874,10 +2876,28 @@ function changeWater(date, step){
   renderSchedule();
 }
 
-function waterLine(events, date){
+/* Water pace: the goal spread evenly from wake-up to 8 PM. From noon, being WATER_BEHIND_AT or more
+   bottles behind that pace turns the line orange with how many to catch up. */
+var WATER_PACE_END_MIN = 20*60, WATER_NUDGE_FROM_MIN = 12*60, WATER_BEHIND_AT = 2;
+
+function waterBehind(events, date, count, goal, minute){
+  if(minute < WATER_NUDGE_FROM_MIN) return 0;
+  var wake = sleepPlan(events, date).wakeMin;
+  var share = WATER_PACE_END_MIN > wake ? (minute - wake)/(WATER_PACE_END_MIN - wake) : 1;
+  var expected = Math.floor(goal * Math.max(0, Math.min(1, share)));
+  var behind = expected - count;
+  return behind >= WATER_BEHIND_AT ? behind : 0;
+}
+
+function waterLine(events, date, minute){
   var count = state.waterLog[date] || 0, goal = waterGoal(events);
-  return '<p class="sleep-line water-line"><b>Water:</b> '+count+' of '+goal+' bottles'+
+  var behind = waterBehind(events, date, count, goal, minute);
+  var catchUp = minute < WATER_PACE_END_MIN
+    ? 'drink one now, then '+(behind-1)+' more by 8 PM'
+    : 'drink one before bed';
+  return '<p class="sleep-line water-line'+(behind ? ' is-behind' : '')+'"><b>Water:</b> '+count+' of '+goal+' bottles'+
     (count >= goal ? ' <span class="water-done">✓ Goal reached</span>' : '')+
+    (behind ? ' <span class="water-behind">· '+behind+' behind — '+catchUp+'</span>' : '')+
     ' <span class="water-buttons"><button type="button" class="pick-btn" data-water="-1" data-water-date="'+date+'" aria-label="One less bottle"'+(count ? '' : ' disabled')+'>−</button>'+
     '<button type="button" class="pick-btn" data-water="1" data-water-date="'+date+'" aria-label="One more bottle">+</button></span></p>';
 }
