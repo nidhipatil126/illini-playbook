@@ -212,6 +212,14 @@ p.section-sub{margin:0 0 18px;color:var(--ink-soft);font-size:14px;font-weight:6
 .next-up p{margin:0 0 4px;}
 .next-up .sub{margin:0 0 6px 16px;font-size:13.5px;color:var(--ink-soft);}
 .next-up .sub b{color:var(--ink);}
+.game-countdown{margin:4px 0 8px;}
+.game-countdown ol{list-style:none;margin:0 0 0 16px;padding:0;}
+.game-countdown li{display:flex;gap:10px;padding:2px 0;font-size:13.5px;}
+.game-countdown .time{flex:none;width:112px;white-space:nowrap;}
+.game-countdown li.is-done{color:var(--ink-soft);text-decoration:line-through;}
+.game-countdown li.is-current{font-weight:800;}
+.game-countdown em{font-style:normal;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;
+  padding:0 5px;margin-left:4px;background:var(--orange);color:#fff;}
 .next-up .done-btn,.next-up .pick-btn{margin:0 0 0 6px;padding:2px 8px;font-size:12px;vertical-align:middle;}
 .day-detail{border:2px solid var(--line);background:var(--day-tile, var(--surface));padding:14px 16px 10px;margin:-10px 0 26px;}
 .day-detail-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;}
@@ -2300,7 +2308,7 @@ function aheadDayDetail(day, events, dateText){
 // Game-day fuel: a full meal 3-4 hours before the first game of the day,
 // water about 2 hours before, a small snack about 1 hour before, then water after.
 var GAME_MEAL_EARLIEST_MIN = 4*60, GAME_MEAL_LATEST_MIN = 3*60;
-var GAME_WATER_BEFORE_MIN = 2*60, GAME_SNACK_BEFORE_MIN = 60;
+var GAME_WATER_BEFORE_MIN = 2*60, GAME_SNACK_BEFORE_MIN = 60, GAME_WARMUP_BEFORE_MIN = 45;
 // Before this time a 3-4h-early meal would mean waking up in the night.
 var EARLY_GAME_MEAL_FLOOR_MIN = 6*60;
 
@@ -2311,16 +2319,38 @@ function gameDayFuel(events){
   var start = game.startMin;
   var mealFrom = start - GAME_MEAL_EARLIEST_MIN, mealTo = start - GAME_MEAL_LATEST_MIN;
   var meal = mealFrom >= EARLY_GAME_MEAL_FLOOR_MIN
-    ? {time:minToClock(mealFrom)+"\u2013"+minToClock(mealTo), until:mealTo, what:"Full meal", note:"Carb-heavy and easy to digest"}
-    : {time:"When you wake up", until:start-GAME_WATER_BEFORE_MIN, what:"Light breakfast", note:"Early game \u2014 keep it small and carb-heavy"};
-  // "until" is the last minute each step still makes sense, used by the Next up banner.
+    ? {time:minToClock(mealFrom)+"\u2013"+minToClock(mealTo), from:mealFrom, until:mealTo, what:"Full meal", note:"Carb-heavy and easy to digest"}
+    : {time:"When you wake up", from:0, until:start-GAME_WATER_BEFORE_MIN, what:"Light breakfast", note:"Early game \u2014 keep it small and carb-heavy"};
+  // "from" is when each step starts and "until" the last minute it still makes sense, used by the Next up countdown.
   return [
     meal,
-    {time:minToClock(start-GAME_WATER_BEFORE_MIN), until:start-GAME_WATER_BEFORE_MIN, what:"Water", note:"Drink 16\u201320 oz"},
-    {time:minToClock(start-GAME_SNACK_BEFORE_MIN), until:start-GAME_SNACK_BEFORE_MIN, what:"Small snack", note:"Banana, granola bar or crackers"},
-    {time:minToClock(start), until:game.endMin, what:game.ref.title, note:"Keep sipping water during", isGame:true},
-    {time:minToClock(game.endMin), until:game.endMin+60, what:"Refill water", note:"Drink to replace what you sweated out"}
+    {time:minToClock(start-GAME_WATER_BEFORE_MIN), from:start-GAME_WATER_BEFORE_MIN, until:start-GAME_WATER_BEFORE_MIN, what:"Water", note:"Drink 16\u201320 oz"},
+    {time:minToClock(start-GAME_SNACK_BEFORE_MIN), from:start-GAME_SNACK_BEFORE_MIN, until:start-GAME_SNACK_BEFORE_MIN, what:"Small snack", note:"Banana, granola bar or crackers"},
+    {time:minToClock(start-GAME_WARMUP_BEFORE_MIN), from:start-GAME_WARMUP_BEFORE_MIN, until:start-1, what:"Warm-up", note:"Dynamic stretches, light jog"},
+    {time:minToClock(start), from:start, until:game.endMin, what:game.ref.title, note:"Keep sipping water during", isGame:true},
+    {time:minToClock(game.endMin), from:game.endMin, until:game.endMin+60, what:"Refill water", note:"Drink to replace what you sweated out"}
   ];
+}
+
+/* Pre-game countdown in Next up: all of game day until the post-game water, every fuel step with
+   past ones checked off and the first one not yet done marked now or next. */
+function gameCountdown(events, minute){
+  var steps = gameDayFuel(events);
+  if(!steps || minute > steps[steps.length-1].until) return "";
+  var game = steps.filter(function(step){ return step.isGame; })[0];
+  var head = minute < game.from ? 'Game in '+lengthText(game.from-minute)
+    : minute < game.until ? 'Game on \u2014 until '+minToClock(game.until)
+    : 'Game done \u2014 refuel';
+  var currentFound = false;
+  return '<div class="game-countdown"><p><b>'+head+'</b></p><ol>'+steps.map(function(step){
+    var done = step.until < minute;
+    var current = !done && !currentFound;
+    if(current) currentFound = true;
+    var tag = current ? (minute >= step.from ? 'now' : 'next') : '';
+    return '<li class="'+(done ? 'is-done' : current ? 'is-current' : '')+'">'+
+      '<span class="time">'+(done ? '\u2713 ' : '')+step.time+'</span>'+
+      '<span>'+escapeHtml(step.what)+(tag ? ' <em>'+tag+'</em>' : '')+'</span></li>';
+  }).join("")+'</ol></div>';
 }
 
 function gameFuelCard(events){
@@ -2472,8 +2502,7 @@ function nextUpLines(byDay, now){
     if(!idea && !meal) lines.push('<p class="sub">Nothing planned <button type="button" class="pick-btn" data-plan-day="'+day+'">Plan it \u2192</button></p>');
   }
 
-  var fuelStep = (gameDayFuel(events) || []).find(function(step){ return !step.isGame && step.until>=minute; });
-  if(fuelStep) lines.push('<p class="sub">Game fuel: <b>'+escapeHtml(fuelStep.what)+'</b> '+(fuelStep.time.indexOf("When")===0 ? fuelStep.time.toLowerCase() : 'at '+fuelStep.time)+'</p>');
+  lines.push(gameCountdown(events, minute));
 
   var next = events.find(function(e){ return e.startMin>minute; });
   if(state.commitments.length===0){
