@@ -2653,7 +2653,8 @@ function nextUpLines(byDay, now){
   } else {
     var tomorrow = DAYS[(DAYS.indexOf(day)+1)%7];
     var first = eventsOn(tomorrow, byDay, day==="Sun")[0];
-    lines.push('<p><b>'+(events.length ? 'Done for today.' : 'Nothing scheduled today.')+'</b> '+(first
+    // During the day's last commitment it isn't done yet, so it says so instead.
+    lines.push('<p><b>'+(current ? 'Last one today.' : events.length ? 'Done for today.' : 'Nothing scheduled today.')+'</b> '+(first
       ? 'Tomorrow starts with '+escapeHtml(first.ref.title)+' at '+minToClock(first.startMin)+'.'
       : 'Tomorrow is free.')+'</p>');
   }
