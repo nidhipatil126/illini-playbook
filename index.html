@@ -216,8 +216,17 @@ p.section-sub{margin:0 0 18px;color:var(--ink-soft);font-size:14px;font-weight:6
 .game-countdown ol{list-style:none;margin:0 0 0 16px;padding:0;}
 .game-countdown li{display:flex;gap:10px;padding:2px 0;font-size:13.5px;}
 .game-countdown .time{flex:none;width:112px;white-space:nowrap;}
-.game-countdown li.is-done{color:var(--ink-soft);text-decoration:line-through;}
+.game-countdown li.is-past{color:var(--ink-soft);}
+.game-countdown li.is-checked{color:var(--ink-soft);text-decoration:line-through;}
 .game-countdown li.is-current{font-weight:800;}
+.fuel-check{display:flex;align-items:center;gap:6px;padding:0;margin:0;border:none;background:none;font:inherit;color:inherit;text-decoration:inherit;text-align:left;cursor:pointer;}
+.fuel-check .box{display:inline-flex;align-items:center;justify-content:center;flex:none;width:18px;height:18px;border:1.5px solid var(--ink);
+  background:var(--surface);font-size:13px;font-weight:800;color:#fff;}
+.fuel-check[aria-pressed="true"] .box{background:var(--turf);border-color:var(--turf);}
+.game-fuel-recap{list-style:none;margin:0 0 24px;padding:0;}
+.game-fuel-recap li{padding:4px 0;font-size:15px;border-top:1px solid var(--line);}
+.game-fuel-recap li:first-child{border-top:none;}
+.game-fuel-recap .last-week{color:var(--ink-soft);font-size:14px;}
 .game-countdown em{font-style:normal;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;
   padding:0 5px;margin-left:4px;background:var(--orange);color:#fff;}
 .next-up .done-btn,.next-up .pick-btn{margin:0 0 0 6px;padding:2px 8px;font-size:12px;vertical-align:middle;}
@@ -910,6 +919,8 @@ footer.foot{
     <div id="recapExams"></div>
     <h3 class="recap-heading">Sleep</h3>
     <div id="recapSleep"></div>
+    <h3 class="recap-heading">Game fuel</h3>
+    <div id="recapGameFuel"></div>
     <h3 class="recap-heading">Suggestions</h3>
     <ul class="recap-tips" id="recapTips"></ul>
     <h3 class="recap-heading">Day by day</h3>
@@ -1048,6 +1059,7 @@ var SLEEP_LOG_KEY = STORAGE_PREFIX + "illini-playbook-sleep-log-v1";
 var ENERGY_LOG_KEY = STORAGE_PREFIX + "illini-playbook-energy-log-v1";
 var BREAKS_KEY = STORAGE_PREFIX + "illini-playbook-breaks-v1";
 var GROCERY_KEY = STORAGE_PREFIX + "illini-playbook-grocery-v1";
+var GAME_FUEL_KEY = STORAGE_PREFIX + "illini-playbook-game-fuel-v1";
 if (IS_TEST_COPY) {
   var testBanner = document.createElement("p");
   testBanner.className = "test-copy-banner";
@@ -1099,6 +1111,7 @@ var state = {
   breakFormOpen: false, // whether the Breaks card's "Add break" form is showing
   weekAhead: false,     // true while Schedule shows next week (view only)
   grocery: {own:[], checked:{}}, // own: item names typed in; checked: "monday date|item" -> true
+  gameFuelDone: {},     // "date|step" (meal, water, snack, refill) -> true for game-day fuel steps checked off
   sleep: {hours:8, readyMin:60}, // sleep goal and time to get ready before the first commitment
   sleepFormOpen: false,  // whether Next up's sleep settings are showing
   sleepLog: {},          // morning date ("2026-11-23") -> "ontime" | "late" | "overslept"
@@ -2173,6 +2186,7 @@ function renderRecap(){
   renderFollowThrough(last, followThrough(0));
   renderExamPrep();
   renderSleepRecap();
+  renderGameFuelRecap();
   document.getElementById("recapTips").innerHTML = recapSuggestions(summary, last, week).map(function(tip){
     return '<li'+(tip.good?' class="good"':'')+'><span>'+escapeHtml(tip.text)+'</span>'+
       (tip.day ? '<button type="button" class="pick-btn" data-plan-day="'+tip.day+'">Plan '+tip.day+' \u2192</button>' : '')+'</li>';
@@ -2336,22 +2350,22 @@ function gameDayFuel(events){
   var start = game.startMin;
   var mealFrom = start - GAME_MEAL_EARLIEST_MIN, mealTo = start - GAME_MEAL_LATEST_MIN;
   var meal = mealFrom >= EARLY_GAME_MEAL_FLOOR_MIN
-    ? {time:minToClock(mealFrom)+"\u2013"+minToClock(mealTo), from:mealFrom, until:mealTo, what:"Full meal", note:"Carb-heavy and easy to digest"}
-    : {time:"When you wake up", from:0, until:start-GAME_WATER_BEFORE_MIN, what:"Light breakfast", note:"Early game \u2014 keep it small and carb-heavy"};
+    ? {key:"meal", time:minToClock(mealFrom)+"\u2013"+minToClock(mealTo), from:mealFrom, until:mealTo, what:"Full meal", note:"Carb-heavy and easy to digest"}
+    : {key:"meal", time:"When you wake up", from:0, until:start-GAME_WATER_BEFORE_MIN, what:"Light breakfast", note:"Early game \u2014 keep it small and carb-heavy"};
   // "from" is when each step starts and "until" the last minute it still makes sense, used by the Next up countdown.
   return [
     meal,
-    {time:minToClock(start-GAME_WATER_BEFORE_MIN), from:start-GAME_WATER_BEFORE_MIN, until:start-GAME_WATER_BEFORE_MIN, what:"Water", note:"Drink 16\u201320 oz"},
-    {time:minToClock(start-GAME_SNACK_BEFORE_MIN), from:start-GAME_SNACK_BEFORE_MIN, until:start-GAME_SNACK_BEFORE_MIN, what:"Small snack", note:"Banana, granola bar or crackers"},
+    {key:"water", time:minToClock(start-GAME_WATER_BEFORE_MIN), from:start-GAME_WATER_BEFORE_MIN, until:start-GAME_WATER_BEFORE_MIN, what:"Water", note:"Drink 16\u201320 oz"},
+    {key:"snack", time:minToClock(start-GAME_SNACK_BEFORE_MIN), from:start-GAME_SNACK_BEFORE_MIN, until:start-GAME_SNACK_BEFORE_MIN, what:"Small snack", note:"Banana, granola bar or crackers"},
     {time:minToClock(start-GAME_WARMUP_BEFORE_MIN), from:start-GAME_WARMUP_BEFORE_MIN, until:start-1, what:"Warm-up", note:"Dynamic stretches, light jog"},
     {time:minToClock(start), from:start, until:game.endMin, what:game.ref.title, note:"Keep sipping water during", isGame:true},
-    {time:minToClock(game.endMin), from:game.endMin, until:game.endMin+60, what:"Refill water", note:"Drink to replace what you sweated out"}
+    {key:"refill", time:minToClock(game.endMin), from:game.endMin, until:game.endMin+60, what:"Refill water", note:"Drink to replace what you sweated out"}
   ];
 }
 
 /* Pre-game countdown in Next up: all of game day until the post-game water, every fuel step with
    past ones checked off and the first one not yet done marked now or next. */
-function gameCountdown(events, minute){
+function gameCountdown(events, minute, date){
   var steps = gameDayFuel(events);
   if(!steps || minute > steps[steps.length-1].until) return "";
   var game = steps.filter(function(step){ return step.isGame; })[0];
@@ -2360,14 +2374,66 @@ function gameCountdown(events, minute){
     : 'Game done \u2014 refuel';
   var currentFound = false;
   return '<div class="game-countdown"><p><b>'+head+'</b></p><ol>'+steps.map(function(step){
-    var done = step.until < minute;
-    var current = !done && !currentFound;
+    var checked = !!(step.key && state.gameFuelDone[date+"|"+step.key]);
+    var past = step.until < minute;
+    var current = !checked && !past && !currentFound;
     if(current) currentFound = true;
     var tag = current ? (minute >= step.from ? 'now' : 'next') : '';
-    return '<li class="'+(done ? 'is-done' : current ? 'is-current' : '')+'">'+
-      '<span class="time">'+(done ? '\u2713 ' : '')+step.time+'</span>'+
-      '<span>'+escapeHtml(step.what)+(tag ? ' <em>'+tag+'</em>' : '')+'</span></li>';
+    var label = '<span>'+escapeHtml(step.what)+(tag ? ' <em>'+tag+'</em>' : '')+'</span>';
+    // Fuel steps can be checked off, even late; the warm-up and the game can't.
+    var what = step.key
+      ? '<button type="button" class="fuel-check" data-game-fuel="'+step.key+'" data-game-date="'+date+'" aria-pressed="'+checked+'">'+
+          '<span class="box" aria-hidden="true">'+(checked ? '\u2713' : '')+'</span>'+label+'</button>'
+      : label;
+    return '<li class="'+(checked ? 'is-checked' : current ? 'is-current' : past ? 'is-past' : '')+'">'+
+      '<span class="time">'+step.time+'</span>'+what+'</li>';
   }).join("")+'</ol></div>';
+}
+
+var GAME_FUEL_STEPS = ["meal", "water", "snack", "refill"];
+
+function loadGameFuelDone(){
+  var saved = loadPickMap(GAME_FUEL_KEY);
+  var oldest = dateOfThisWeek("Mon", 1);
+  state.gameFuelDone = {};
+  Object.keys(saved).forEach(function(key){
+    var parts = key.split("|");
+    if(isDateText(parts[0]) && parts[0] >= oldest && GAME_FUEL_STEPS.indexOf(parts[1])>=0 && saved[key]===true) state.gameFuelDone[key] = true;
+  });
+}
+
+function toggleGameFuel(date, step){
+  var key = date+"|"+step;
+  if(state.gameFuelDone[key]) delete state.gameFuelDone[key];
+  else state.gameFuelDone[key] = true;
+  savePickMap(GAME_FUEL_KEY, state.gameFuelDone);
+  renderSchedule();
+}
+
+// Each game in a week, with how many of its fuel steps were checked off.
+function gameFuelWeek(weeksBack){
+  var byDay = expandByDay(weeksBack);
+  return DAYS.filter(function(d){ return gameDayFuel(byDay[d]); }).map(function(d){
+    var date = dateOfThisWeek(d, weeksBack);
+    var done = GAME_FUEL_STEPS.filter(function(step){ return state.gameFuelDone[date+"|"+step]; }).length;
+    return {day:d, date:date, done:done, total:GAME_FUEL_STEPS.length};
+  });
+}
+
+function renderGameFuelRecap(){
+  var el = document.getElementById("recapGameFuel");
+  var thisWeek = gameFuelWeek(0), lastWeek = gameFuelWeek(1);
+  if(!thisWeek.length && !lastWeek.length){
+    el.innerHTML = '<p class="recap-note" style="margin-bottom:24px">No games this week or last. On game days, check off fuel steps in Next up’s countdown.</p>';
+    return;
+  }
+  var today = dateTextOf(clockNow());
+  var sum = function(list, field){ return list.reduce(function(n, g){ return n + g[field]; }, 0); };
+  el.innerHTML = '<ul class="game-fuel-recap">'+thisWeek.map(function(g){
+      return '<li><b>'+g.day+' game:</b> '+(g.date > today ? 'coming up' : g.done+' of '+g.total+' fuel steps')+'</li>';
+    }).join("")+
+    (lastWeek.length ? '<li class="last-week">Last week: '+sum(lastWeek, "done")+' of '+sum(lastWeek, "total")+' fuel steps across '+countText(lastWeek.length, "game")+'</li>' : '')+
+    '</ul>';
 }
 
 function gameFuelCard(events){
@@ -2519,7 +2585,7 @@ function nextUpLines(byDay, now){
     if(!idea && !meal) lines.push('<p class="sub">Nothing planned <button type="button" class="pick-btn" data-plan-day="'+day+'">Plan it \u2192</button></p>');
   }
 
-  lines.push(gameCountdown(events, minute));
+  lines.push(gameCountdown(events, minute, dateTextOf(now)));
 
   var next = events.find(function(e){ return e.startMin>minute; });
   if(state.commitments.length===0){
@@ -2869,10 +2935,10 @@ function startFresh(){
   state.mealPicks = {}; state.activityPicks = {}; state.weekPicks = {}; state.activityDone = {};
   state.customIdeas = {}; state.mealEaten = {}; state.exams = []; state.weekChanges = {}; state.changeFormFor = null;
   state.oneTimeEvents = []; state.oneTimeFormOpen = false; state.sleepLog = {}; state.energyLog = {};
-  state.breaks = []; state.breakFormOpen = false; state.grocery = {own:[], checked:{}};
+  state.breaks = []; state.breakFormOpen = false; state.grocery = {own:[], checked:{}}; state.gameFuelDone = {};
   state.expandedGaps = {}; state.selectedDay = null; state.customFormGap = null;
   saveCommitments();
-  [PICKS_KEY, ACTIVITY_PICKS_KEY, WEEK_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY, MEAL_EATEN_KEY, WEEK_CHANGES_KEY, SLEEP_LOG_KEY, ENERGY_LOG_KEY].forEach(function(key){ savePickMap(key, {}); });
+  [PICKS_KEY, ACTIVITY_PICKS_KEY, WEEK_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY, MEAL_EATEN_KEY, WEEK_CHANGES_KEY, SLEEP_LOG_KEY, ENERGY_LOG_KEY, GAME_FUEL_KEY].forEach(function(key){ savePickMap(key, {}); });
   saveExams();
   saveOneTimeEvents();
   saveBreaks();
@@ -2892,7 +2958,7 @@ var MAX_PLAN_TEXT = 500000;
 // Saved without the test copy's prefix, so a plan moves between the test and main copies too.
 function planStorageKeys(){
   return [STORAGE_KEY, PROFILE_KEY, PICKS_KEY, ACTIVITY_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY,
-    SEASON_KEY, MEAL_EATEN_KEY, EXAMS_KEY, WEEK_CHANGES_KEY, ONE_TIME_KEY, WEEK_PICKS_KEY, SLEEP_KEY, SLEEP_LOG_KEY, ENERGY_LOG_KEY, BREAKS_KEY, GROCERY_KEY];
+    SEASON_KEY, MEAL_EATEN_KEY, EXAMS_KEY, WEEK_CHANGES_KEY, ONE_TIME_KEY, WEEK_PICKS_KEY, SLEEP_KEY, SLEEP_LOG_KEY, ENERGY_LOG_KEY, BREAKS_KEY, GROCERY_KEY, GAME_FUEL_KEY];
 }
 function planKeyName(storageKey){ return storageKey.slice(STORAGE_PREFIX.length); }
 
@@ -3657,6 +3723,7 @@ function loadSavedPlan(){
   loadEnergyLog();
   loadBreaks();
   loadGrocery();
+  loadGameFuelDone();
 }
 
 function init(){
@@ -3691,6 +3758,8 @@ function init(){
     if(sleepResultBtn) setSleepResult(sleepResultBtn.dataset.sleepDate, sleepResultBtn.dataset.sleepResult);
     var energyResultBtn = ev.target.closest("[data-energy-result]");
     if(energyResultBtn) setEnergyResult(energyResultBtn.dataset.energyDate, energyResultBtn.dataset.energyResult);
+    var fuelBtn = ev.target.closest("[data-game-fuel]");
+    if(fuelBtn) toggleGameFuel(fuelBtn.dataset.gameDate, fuelBtn.dataset.gameFuel);
   });
   document.getElementById("nextUp").addEventListener("change", function(ev){
     if(ev.target.matches("[data-sleep-hours]")) state.sleep.hours = Number(ev.target.value);
