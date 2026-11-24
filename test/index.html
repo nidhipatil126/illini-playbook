@@ -251,6 +251,19 @@ p.section-sub{margin:0 0 18px;color:var(--ink-soft);font-size:14px;font-weight:6
 .week-ahead li{padding:3px 0;font-size:14px;border-top:1px solid var(--line);}
 .week-ahead li:first-child{border-top:none;}
 .ahead-note{margin:10px 0 0;font-size:13px;color:var(--ink-soft);}
+/* Grocery list on Fuel: snacks this week's games, travel and snack picks need, plus your own items. */
+.grocery-card h3{margin:0 0 4px;font-family:var(--font-display);font-size:20px;}
+.grocery-card ul{list-style:none;margin:0 0 10px;padding:0;}
+.grocery-card li{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--line);}
+.grocery-card li:first-child{border-top:none;}
+.grocery-card li label{flex:1;display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;
+  text-transform:none;letter-spacing:normal;font-size:15px;font-weight:600;color:var(--ink);}
+.grocery-card li input[type=checkbox]{width:20px;height:20px;flex:none;}
+.grocery-card li.is-checked .item{text-decoration:line-through;color:var(--ink-soft);}
+.grocery-card li small{display:block;font-size:12px;font-weight:400;color:var(--ink-soft);}
+.grocery-card .grocery-remove{background:none;border:none;font:inherit;font-size:13px;font-weight:700;color:var(--danger);cursor:pointer;}
+.grocery-add{display:flex;gap:8px;flex-wrap:wrap;}
+.grocery-add input{flex:1;min-width:140px;padding:6px 8px;font:inherit;font-size:14px;border:2px solid var(--ink);background:var(--surface);color:var(--ink);}
 .idea-select{display:block;width:100%;max-width:320px;margin-top:6px;font:inherit;font-size:13.5px;font-weight:600;
   padding:6px 8px;color:var(--ink);background:var(--surface);border:2px solid var(--ink);cursor:pointer;}
 .custom-form{margin-top:8px;padding:10px 12px;border:1.5px solid var(--line);background:var(--surface);max-width:320px;color:var(--ink);}
@@ -806,6 +819,8 @@ footer.foot{
     <h2 class="section-title">Fuel plan</h2>
     <p class="section-sub">Open windows between commitments, with what to eat.</p>
 
+    <div class="start-fresh grocery-card" id="grocery" role="region" aria-label="Grocery list" aria-live="polite"></div>
+
     <div class="card fuel-profile">
       <div class="calc-box">
         <div>
@@ -1032,6 +1047,7 @@ var SLEEP_KEY = STORAGE_PREFIX + "illini-playbook-sleep-v1";
 var SLEEP_LOG_KEY = STORAGE_PREFIX + "illini-playbook-sleep-log-v1";
 var ENERGY_LOG_KEY = STORAGE_PREFIX + "illini-playbook-energy-log-v1";
 var BREAKS_KEY = STORAGE_PREFIX + "illini-playbook-breaks-v1";
+var GROCERY_KEY = STORAGE_PREFIX + "illini-playbook-grocery-v1";
 if (IS_TEST_COPY) {
   var testBanner = document.createElement("p");
   testBanner.className = "test-copy-banner";
@@ -1082,6 +1098,7 @@ var state = {
   breaks: [],           // {id, name, from, to}: date ranges when classes and study hall pause
   breakFormOpen: false, // whether the Breaks card's "Add break" form is showing
   weekAhead: false,     // true while Schedule shows next week (view only)
+  grocery: {own:[], checked:{}}, // own: item names typed in; checked: "monday date|item" -> true
   sleep: {hours:8, readyMin:60}, // sleep goal and time to get ready before the first commitment
   sleepFormOpen: false,  // whether Next up's sleep settings are showing
   sleepLog: {},          // morning date ("2026-11-23") -> "ontime" | "late" | "overslept"
@@ -2852,13 +2869,14 @@ function startFresh(){
   state.mealPicks = {}; state.activityPicks = {}; state.weekPicks = {}; state.activityDone = {};
   state.customIdeas = {}; state.mealEaten = {}; state.exams = []; state.weekChanges = {}; state.changeFormFor = null;
   state.oneTimeEvents = []; state.oneTimeFormOpen = false; state.sleepLog = {}; state.energyLog = {};
-  state.breaks = []; state.breakFormOpen = false;
+  state.breaks = []; state.breakFormOpen = false; state.grocery = {own:[], checked:{}};
   state.expandedGaps = {}; state.selectedDay = null; state.customFormGap = null;
   saveCommitments();
   [PICKS_KEY, ACTIVITY_PICKS_KEY, WEEK_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY, MEAL_EATEN_KEY, WEEK_CHANGES_KEY, SLEEP_LOG_KEY, ENERGY_LOG_KEY].forEach(function(key){ savePickMap(key, {}); });
   saveExams();
   saveOneTimeEvents();
   saveBreaks();
+  saveGrocery();
   renderBreaks();
   startFreshConfirming = false;
   startFreshMessage = {text:"Cleared.", count:0};
@@ -2874,7 +2892,7 @@ var MAX_PLAN_TEXT = 500000;
 // Saved without the test copy's prefix, so a plan moves between the test and main copies too.
 function planStorageKeys(){
   return [STORAGE_KEY, PROFILE_KEY, PICKS_KEY, ACTIVITY_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY,
-    SEASON_KEY, MEAL_EATEN_KEY, EXAMS_KEY, WEEK_CHANGES_KEY, ONE_TIME_KEY, WEEK_PICKS_KEY, SLEEP_KEY, SLEEP_LOG_KEY, ENERGY_LOG_KEY, BREAKS_KEY];
+    SEASON_KEY, MEAL_EATEN_KEY, EXAMS_KEY, WEEK_CHANGES_KEY, ONE_TIME_KEY, WEEK_PICKS_KEY, SLEEP_KEY, SLEEP_LOG_KEY, ENERGY_LOG_KEY, BREAKS_KEY, GROCERY_KEY];
 }
 function planKeyName(storageKey){ return storageKey.slice(STORAGE_PREFIX.length); }
 
@@ -3240,7 +3258,111 @@ function renderFuelChange(goal, changedCount, shownCount){
     goalBefore.protein+" to "+goal.protein+" g protein and "+goalBefore.carbs+" to "+goal.carbs+" g carbs. "+foods;
 }
 
+/* Grocery list: dining hall meals don't need buying, but snacks do. Each game day, travel day and
+   snack pick this week suggests items; your own items stay until removed; checks reset each Monday. */
+var MAX_GROCERY_ITEM = 40;
+var MAX_GROCERY_OWN = 50;
+// Item names for each source, in the order they show.
+var GROCERY_FOR_GAME = ["Bananas", "Granola bars"];
+var GROCERY_FOR_TRAVEL = ["Bread + peanut butter", "Apples or oranges", "Granola bars"];
+var GROCERY_FOR_IDEA = {
+  "Snack: fruit + protein": ["Apples or oranges", "Greek yogurt or string cheese"],
+  "Hydrate and snack": ["Granola bars"]
+};
+
+function loadGrocery(){
+  var saved;
+  try{ saved = JSON.parse(localStorage.getItem(GROCERY_KEY)); }
+  catch(e){ saved = null; /* unreadable — start with an empty list */ }
+  var weekStart = dateOfThisWeek("Mon");
+  var own = saved && Array.isArray(saved.own) ? saved.own.filter(function(x){ return typeof x==="string" && x.trim(); }) : [];
+  var checked = {};
+  if(saved && saved.checked && typeof saved.checked==="object"){
+    Object.keys(saved.checked).forEach(function(key){ if(key.split("|")[0]===weekStart && saved.checked[key]===true) checked[key] = true; });
+  }
+  state.grocery = {own:own.slice(0, MAX_GROCERY_OWN), checked:checked};
+}
+function saveGrocery(){
+  try{ localStorage.setItem(GROCERY_KEY, JSON.stringify(state.grocery)); }
+  catch(e){ /* storage unavailable — the list still holds for this session */ }
+}
+function groceryCheckKey(item){ return dateOfThisWeek("Mon")+"|"+item; }
+
+// [{item, reasons:["Sat game", ...]}] from this week's games, travel and snack picks, in first-seen order.
+function suggestedGroceries(byDay){
+  var found = [];
+  var add = function(items, reason){
+    items.forEach(function(item){
+      var entry = found.filter(function(x){ return x.item===item; })[0];
+      if(!entry){ entry = {item:item, reasons:[]}; found.push(entry); }
+      if(entry.reasons.indexOf(reason)<0) entry.reasons.push(reason);
+    });
+  };
+  DAYS.forEach(function(d){
+    var events = byDay[d];
+    if(events.some(function(e){ return e.ref.type==="game"; })) add(GROCERY_FOR_GAME, d+" game");
+    if(events.some(function(e){ return e.ref.type==="travel"; })) add(GROCERY_FOR_TRAVEL, d+" travel");
+    findGaps(events).forEach(function(g){
+      var idea = pickValue(gapKey(d, g));
+      if(GROCERY_FOR_IDEA[idea]) add(GROCERY_FOR_IDEA[idea], d+" snack");
+    });
+  });
+  return found;
+}
+
+function groceryRow(item, note, isOwn){
+  var checked = !!state.grocery.checked[groceryCheckKey(item)];
+  return '<li class="'+(checked ? 'is-checked' : '')+'"><label><input type="checkbox" data-grocery-check="'+escapeAttr(item)+'"'+(checked ? ' checked' : '')+'>'+
+    '<span><span class="item">'+escapeHtml(item)+'</span>'+(note ? '<small>'+escapeHtml(note)+'</small>' : '')+'</span></label>'+
+    (isOwn ? '<button type="button" class="grocery-remove" data-grocery-remove="'+escapeAttr(item)+'" aria-label="Remove '+escapeAttr(item)+'">Remove</button>' : '')+
+    '</li>';
+}
+
+function renderGrocery(error){
+  var el = document.getElementById("grocery");
+  var suggested = suggestedGroceries(expandByDay());
+  var suggestedNames = suggested.map(function(x){ return x.item; });
+  var own = state.grocery.own.filter(function(item){ return suggestedNames.indexOf(item)<0; });
+  var rows = suggested.map(function(x){ return groceryRow(x.item, 'For '+x.reasons.join(', '), false); })
+    .concat(own.map(function(item){ return groceryRow(item, '', true); }));
+  el.innerHTML = '<h3>Grocery list</h3>'+
+    '<p>Snacks for this week’s games, travel and snack picks. Checks reset each Monday.</p>'+
+    (rows.length ? '<ul>'+rows.join("")+'</ul>' : '<p class="empty-note">Nothing yet. Games, travel and snack picks add items here, or add your own.</p>')+
+    '<div class="grocery-add"><input type="text" data-grocery-new maxlength="'+MAX_GROCERY_ITEM+'" placeholder="Add an item, like Milk" aria-label="New grocery item">'+
+    '<button type="button" class="btn secondary" data-grocery-add>Add</button></div>'+
+    '<p class="custom-error" role="alert">'+(error ? escapeHtml(error) : '')+'</p>';
+}
+
+function addGroceryItem(){
+  var input = document.querySelector("#grocery [data-grocery-new]");
+  var item = input.value.trim().slice(0, MAX_GROCERY_ITEM);
+  if(!item){ renderGrocery("Type an item first."); return; }
+  var all = state.grocery.own.concat(suggestedGroceries(expandByDay()).map(function(x){ return x.item; }));
+  if(all.some(function(x){ return x.toLowerCase()===item.toLowerCase(); })){ renderGrocery(item+" is already on the list."); return; }
+  if(state.grocery.own.length >= MAX_GROCERY_OWN){ renderGrocery("The list is full. Remove an item first."); return; }
+  state.grocery.own.push(item);
+  saveGrocery();
+  renderGrocery();
+  document.querySelector("#grocery [data-grocery-new]").focus();
+}
+
+function toggleGroceryItem(item){
+  var key = groceryCheckKey(item);
+  if(state.grocery.checked[key]) delete state.grocery.checked[key];
+  else state.grocery.checked[key] = true;
+  saveGrocery();
+  renderGrocery();
+}
+
+function removeGroceryItem(item){
+  state.grocery.own = state.grocery.own.filter(function(x){ return x!==item; });
+  delete state.grocery.checked[groceryCheckKey(item)];
+  saveGrocery();
+  renderGrocery();
+}
+
 function renderFuel(){
+  renderGrocery();
   buildFuelDaySelector();
   var goal = mealGoal(state.profile);
   var goalBefore = mealGoal(state.previousProfile);
@@ -3534,6 +3656,7 @@ function loadSavedPlan(){
   loadSleepLog();
   loadEnergyLog();
   loadBreaks();
+  loadGrocery();
 }
 
 function init(){
@@ -3638,6 +3761,18 @@ function init(){
     if(form && ev.key==="Enter" && ev.target.tagName==="INPUT"){ ev.preventDefault(); saveCustomIdea(form); }
     var oneTimeFormEl = ev.target.closest(".one-time-form");
     if(oneTimeFormEl && ev.key==="Enter" && ev.target.tagName==="INPUT"){ ev.preventDefault(); saveOneTimeEvent(oneTimeFormEl, state.selectedDay); }
+  });
+  document.getElementById("grocery").addEventListener("click", function(ev){
+    if(ev.target.closest("[data-grocery-add]")) addGroceryItem();
+    var removeBtn = ev.target.closest("[data-grocery-remove]");
+    if(removeBtn) removeGroceryItem(removeBtn.dataset.groceryRemove);
+  });
+  document.getElementById("grocery").addEventListener("change", function(ev){
+    var box = ev.target.closest("[data-grocery-check]");
+    if(box) toggleGroceryItem(box.dataset.groceryCheck);
+  });
+  document.getElementById("grocery").addEventListener("keydown", function(ev){
+    if(ev.key==="Enter" && ev.target.closest("[data-grocery-new]")){ ev.preventDefault(); addGroceryItem(); }
   });
   document.getElementById("breaks").addEventListener("click", function(ev){
     if(ev.target.closest("[data-break-open]")){
