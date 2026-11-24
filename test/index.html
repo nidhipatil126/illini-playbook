@@ -650,6 +650,12 @@ details.acc .acc-body{padding:14px 16px;}
 .sleep-dots .dot.wiped{background:var(--ink-soft);border-color:var(--ink-soft);}
 .sleep-dots .dot.okay{background:#E5B53A;border-color:#E5B53A;}
 .sleep-dots .dot.fresh{background:var(--turf);border-color:var(--turf);}
+.sleep-dots .dot.met{background:var(--turf);border-color:var(--turf);}
+.sleep-dots .dot.half{background:#E5B53A;border-color:#E5B53A;}
+.water-done{font-size:13px;font-weight:800;color:var(--turf);}
+.water-buttons{display:inline-flex;gap:6px;margin-left:4px;}
+.water-buttons .pick-btn{min-width:34px;font-size:16px;}
+.water-buttons .pick-btn:disabled{opacity:.4;cursor:default;}
 .dots-label{font-size:12.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--ink-soft);margin:0 0 4px;}
 .sleep-key{font-size:12.5px;color:var(--ink-soft);margin:0 0 24px;}
 .recap-note{margin:8px 0 0;font-size:13.5px;color:var(--ink-soft);}
@@ -1060,6 +1066,7 @@ var ENERGY_LOG_KEY = STORAGE_PREFIX + "illini-playbook-energy-log-v1";
 var BREAKS_KEY = STORAGE_PREFIX + "illini-playbook-breaks-v1";
 var GROCERY_KEY = STORAGE_PREFIX + "illini-playbook-grocery-v1";
 var GAME_FUEL_KEY = STORAGE_PREFIX + "illini-playbook-game-fuel-v1";
+var WATER_LOG_KEY = STORAGE_PREFIX + "illini-playbook-water-log-v1";
 if (IS_TEST_COPY) {
   var testBanner = document.createElement("p");
   testBanner.className = "test-copy-banner";
@@ -1112,6 +1119,7 @@ var state = {
   weekAhead: false,     // true while Schedule shows next week (view only)
   grocery: {own:[], checked:{}}, // own: item names typed in; checked: "monday date|item" -> true
   gameFuelDone: {},     // "date|step" (meal, water, snack, refill) -> true for game-day fuel steps checked off
+  waterLog: {},         // date -> 16 oz bottles drunk that day
   sleep: {hours:8, readyMin:60}, // sleep goal and time to get ready before the first commitment
   sleepFormOpen: false,  // whether Next up's sleep settings are showing
   sleepLog: {},          // morning date ("2026-11-23") -> "ontime" | "late" | "overslept"
@@ -2586,6 +2594,7 @@ function nextUpLines(byDay, now){
   }
 
   lines.push(gameCountdown(events, minute, dateTextOf(now)));
+  lines.push(waterLine(events, dateTextOf(now)));
 
   var next = events.find(function(e){ return e.startMin>minute; });
   if(state.commitments.length===0){
@@ -2791,11 +2800,62 @@ function loggedThisWeek(log){
   return DAYS.map(function(d){ return log[dateOfThisWeek(d)]; }).filter(Boolean);
 }
 
+/* Water: one tap is one 16 oz bottle. The goal is 6 on a rest day, 8 with training,
+   and 10 on a game or travel day. Recap shows a dot per day. */
+var WATER_GOAL_REST = 6, WATER_GOAL_TRAINING = 8, WATER_GOAL_BIG = 10;
+var MAX_WATER_BOTTLES = 30;
+var WATER_RESULTS = {met:"Goal hit", half:"Half or more", low:"Under half"};
+
+function waterGoal(events){
+  if(events.some(function(e){ return e.ref.type==="game" || e.ref.type==="travel"; })) return WATER_GOAL_BIG;
+  if(events.some(function(e){ return isTraining(e.ref.type); })) return WATER_GOAL_TRAINING;
+  return WATER_GOAL_REST;
+}
+
+function loadWaterLog(){
+  var saved = loadPickMap(WATER_LOG_KEY);
+  var oldest = dateOfThisWeek("Mon", 1);
+  state.waterLog = {};
+  Object.keys(saved).forEach(function(date){
+    var n = saved[date];
+    if(isDateText(date) && date >= oldest && typeof n==="number" && n > 0 && n <= MAX_WATER_BOTTLES && Math.floor(n)===n) state.waterLog[date] = n;
+  });
+}
+
+function changeWater(date, step){
+  var n = Math.max(0, Math.min(MAX_WATER_BOTTLES, (state.waterLog[date] || 0) + step));
+  if(n) state.waterLog[date] = n; else delete state.waterLog[date];
+  savePickMap(WATER_LOG_KEY, state.waterLog);
+  renderSchedule();
+}
+
+function waterLine(events, date){
+  var count = state.waterLog[date] || 0, goal = waterGoal(events);
+  return '<p class="sleep-line water-line"><b>Water:</b> '+count+' of '+goal+' bottles'+
+    (count >= goal ? ' <span class="water-done">✓ Goal reached</span>' : '')+
+    ' <span class="water-buttons"><button type="button" class="pick-btn" data-water="-1" data-water-date="'+date+'" aria-label="One less bottle"'+(count ? '' : ' disabled')+'>−</button>'+
+    '<button type="button" class="pick-btn" data-water="1" data-water-date="'+date+'" aria-label="One more bottle">+</button></span></p>';
+}
+
+// This week's water as Recap results: met the goal, half or more, or under half.
+function waterResults(){
+  var byDay = expandByDay();
+  var results = {};
+  DAYS.forEach(function(d){
+    var date = dateOfThisWeek(d), count = state.waterLog[date] || 0;
+    if(!count) return;
+    var goal = waterGoal(byDay[d]);
+    results[date] = count >= goal ? "met" : count*2 >= goal ? "half" : "low";
+  });
+  return results;
+}
+
 function renderSleepRecap(){
   var el = document.getElementById("recapSleep");
   var sleeps = loggedThisWeek(state.sleepLog), energies = loggedThisWeek(state.energyLog);
-  if(!sleeps.length && !energies.length){
-    el.innerHTML = '<p class="recap-note" style="margin-bottom:24px">No check-ins this week yet. Each morning until noon, Next up asks how you slept, and after training it asks how you feel.</p>';
+  var water = waterResults(), waters = loggedThisWeek(water);
+  if(!sleeps.length && !energies.length && !waters.length){
+    el.innerHTML = '<p class="recap-note" style="margin-bottom:24px">No check-ins this week yet. Each morning until noon, Next up asks how you slept, after training it asks how you feel, and you can log water there all day.</p>';
     return;
   }
   var count = function(list, result){ return list.filter(function(r){ return r===result; }).length; };
@@ -2807,8 +2867,11 @@ function renderSleepRecap(){
     (sleeps.length ? '<p class="sleep-count"><b>'+count(sleeps, "ontime")+' of '+countText(sleeps.length, "night")+' on time</b></p>' : '')+
     '<p class="dots-label">Sleep</p><ul class="sleep-dots">'+weekDots(state.sleepLog, SLEEP_RESULTS)+'</ul>'+
     '<p class="dots-label">Energy</p><ul class="sleep-dots">'+weekDots(state.energyLog, ENERGY_RESULTS)+'</ul>'+
+    '<p class="dots-label">Water</p>'+
+    (waters.length ? '<p class="sleep-count"><b>Hit your water goal '+count(waters, "met")+' of '+countText(waters.length, "day")+'</b></p>' : '')+
+    '<ul class="sleep-dots">'+weekDots(water, WATER_RESULTS)+'</ul>'+
     (tips.length ? '<ul class="recap-tips" style="margin-bottom:8px">'+tips.map(function(t){ return '<li>'+escapeHtml(t)+'</li>'; }).join("")+'</ul>' : '')+
-    '<p class="sleep-key">Sleep: green on time \u00b7 orange late to bed \u00b7 red overslept. Energy: green fresh \u00b7 yellow okay \u00b7 gray wiped. Empty: no check-in.</p>';
+    '<p class="sleep-key">Sleep: green on time \u00b7 orange late to bed \u00b7 red overslept. Energy: green fresh \u00b7 yellow okay \u00b7 gray wiped. Water: green goal hit \u00b7 yellow half or more. Empty: no check-in or under half.</p>';
 }
 
 function wakeLine(events, dateText){
@@ -2935,10 +2998,10 @@ function startFresh(){
   state.mealPicks = {}; state.activityPicks = {}; state.weekPicks = {}; state.activityDone = {};
   state.customIdeas = {}; state.mealEaten = {}; state.exams = []; state.weekChanges = {}; state.changeFormFor = null;
   state.oneTimeEvents = []; state.oneTimeFormOpen = false; state.sleepLog = {}; state.energyLog = {};
-  state.breaks = []; state.breakFormOpen = false; state.grocery = {own:[], checked:{}}; state.gameFuelDone = {};
+  state.breaks = []; state.breakFormOpen = false; state.grocery = {own:[], checked:{}}; state.gameFuelDone = {}; state.waterLog = {};
   state.expandedGaps = {}; state.selectedDay = null; state.customFormGap = null;
   saveCommitments();
-  [PICKS_KEY, ACTIVITY_PICKS_KEY, WEEK_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY, MEAL_EATEN_KEY, WEEK_CHANGES_KEY, SLEEP_LOG_KEY, ENERGY_LOG_KEY, GAME_FUEL_KEY].forEach(function(key){ savePickMap(key, {}); });
+  [PICKS_KEY, ACTIVITY_PICKS_KEY, WEEK_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY, MEAL_EATEN_KEY, WEEK_CHANGES_KEY, SLEEP_LOG_KEY, ENERGY_LOG_KEY, GAME_FUEL_KEY, WATER_LOG_KEY].forEach(function(key){ savePickMap(key, {}); });
   saveExams();
   saveOneTimeEvents();
   saveBreaks();
@@ -2958,7 +3021,7 @@ var MAX_PLAN_TEXT = 500000;
 // Saved without the test copy's prefix, so a plan moves between the test and main copies too.
 function planStorageKeys(){
   return [STORAGE_KEY, PROFILE_KEY, PICKS_KEY, ACTIVITY_PICKS_KEY, ACTIVITY_DONE_KEY, CUSTOM_IDEAS_KEY,
-    SEASON_KEY, MEAL_EATEN_KEY, EXAMS_KEY, WEEK_CHANGES_KEY, ONE_TIME_KEY, WEEK_PICKS_KEY, SLEEP_KEY, SLEEP_LOG_KEY, ENERGY_LOG_KEY, BREAKS_KEY, GROCERY_KEY, GAME_FUEL_KEY];
+    SEASON_KEY, MEAL_EATEN_KEY, EXAMS_KEY, WEEK_CHANGES_KEY, ONE_TIME_KEY, WEEK_PICKS_KEY, SLEEP_KEY, SLEEP_LOG_KEY, ENERGY_LOG_KEY, BREAKS_KEY, GROCERY_KEY, GAME_FUEL_KEY, WATER_LOG_KEY];
 }
 function planKeyName(storageKey){ return storageKey.slice(STORAGE_PREFIX.length); }
 
@@ -3724,6 +3787,7 @@ function loadSavedPlan(){
   loadBreaks();
   loadGrocery();
   loadGameFuelDone();
+  loadWaterLog();
 }
 
 function init(){
@@ -3758,6 +3822,8 @@ function init(){
     if(sleepResultBtn) setSleepResult(sleepResultBtn.dataset.sleepDate, sleepResultBtn.dataset.sleepResult);
     var energyResultBtn = ev.target.closest("[data-energy-result]");
     if(energyResultBtn) setEnergyResult(energyResultBtn.dataset.energyDate, energyResultBtn.dataset.energyResult);
+    var waterBtn = ev.target.closest("[data-water]");
+    if(waterBtn) changeWater(waterBtn.dataset.waterDate, +waterBtn.dataset.water);
     var fuelBtn = ev.target.closest("[data-game-fuel]");
     if(fuelBtn) toggleGameFuel(fuelBtn.dataset.gameDate, fuelBtn.dataset.gameFuel);
   });
