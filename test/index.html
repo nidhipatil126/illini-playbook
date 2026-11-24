@@ -2243,7 +2243,7 @@ function renderDayDetail(byDay){
   el.innerHTML = '<div class="day-detail" role="region" aria-label="'+DAY_FULL[day]+' details">'+
     '<div class="day-detail-head"><h3>'+DAY_FULL[day]+'</h3>'+
     '<button type="button" class="btn secondary" data-close-day>Close</button></div>'+
-    wakeLine(events.slice().sort(function(a,b){ return a.startMin-b.startMin; }))+
+    wakeLine(events.slice().sort(function(a,b){ return a.startMin-b.startMin; }), dateText)+
     breakBanner(dateText)+
     examLines(examsOn(dateText))+
     (soon ? '<p class="study-first-note">'+escapeHtml(soon.exam.name)+' '+
@@ -2472,9 +2472,14 @@ function eventsOn(day, byDay, nextWeek){
 }
 
 // {wakeMin, bedMin (minutes after the previous midnight; negative means before it), first event or null}
-function sleepPlan(events){
+// On a break day, wake by the free-day time unless something starts early enough to need an earlier one.
+function sleepPlan(events, dateText){
   var first = events[0] || null;
+  var onBreak = breakOn(dateText);
   var wake = first ? Math.max(0, first.startMin - state.sleep.readyMin) : FREE_DAY_WAKE_MIN;
+  if(onBreak && wake >= FREE_DAY_WAKE_MIN){
+    return {wakeMin:FREE_DAY_WAKE_MIN, bedMin:FREE_DAY_WAKE_MIN - state.sleep.hours*60, first:null, breakName:onBreak.name};
+  }
   return {wakeMin:wake, bedMin:wake - state.sleep.hours*60, first:first};
 }
 
@@ -2485,9 +2490,11 @@ function sleepHoursText(hours){ return (hours % 1 ? hours.toFixed(1) : hours)+'h
 function sleepLine(byDay, day, minute){
   var isSunday = day==="Sun";
   var tomorrow = DAYS[(DAYS.indexOf(day)+1)%7];
-  var plan = sleepPlan(eventsOn(tomorrow, byDay, isSunday));
+  var plan = sleepPlan(eventsOn(tomorrow, byDay, isSunday), dateOfThisWeek(tomorrow, isSunday ? -1 : 0));
   var bedTonight = plan.bedMin + 1440;   // minutes after today's midnight
-  var why = plan.first
+  var why = plan.breakName
+    ? 'to wake at '+clockAt(plan.wakeMin)+' \u2014 '+escapeHtml(plan.breakName)
+    : plan.first
     ? 'to wake at '+clockAt(plan.wakeMin)+' for '+escapeHtml(plan.first.ref.title)+' ('+minToClock(plan.first.startMin)+')'
     : 'to wake at '+clockAt(plan.wakeMin)+' \u2014 tomorrow is free';
   var text = minute >= bedTonight
@@ -2629,10 +2636,10 @@ function renderSleepRecap(){
     '<p class="sleep-key">Sleep: green on time \u00b7 orange late to bed \u00b7 red overslept. Energy: green fresh \u00b7 yellow okay \u00b7 gray wiped. Empty: no check-in.</p>';
 }
 
-function wakeLine(events){
-  var plan = sleepPlan(events);
+function wakeLine(events, dateText){
+  var plan = sleepPlan(events, dateText);
   return '<p class="day-wake">Wake up by '+clockAt(plan.wakeMin)+' <small>'+
-    (plan.first ? lengthText(state.sleep.readyMin)+' before '+escapeHtml(plan.first.ref.title)+' \u00b7 ' : 'Nothing scheduled \u00b7 ')+
+    (plan.breakName ? escapeHtml(plan.breakName)+' \u00b7 ' : plan.first ? lengthText(state.sleep.readyMin)+' before '+escapeHtml(plan.first.ref.title)+' \u00b7 ' : 'Nothing scheduled \u00b7 ')+
     'bed by '+clockAt(plan.bedMin)+' the night before</small></p>';
 }
 
